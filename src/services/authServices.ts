@@ -1,11 +1,13 @@
 import pool from "../db/db"
 
-class AuthService {
+class AuthServiceClass {
     
-    public async checkUserExist(email: string){
-        const result = await pool.query(`select * from users where email==${email}`)
-        console.log(result)
+    async checkUserExist(email: string) {
+        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        return result; // Return true or false based on existence
     }
 }
+
+const AuthService = new AuthServiceClass()
 
 export default AuthService;

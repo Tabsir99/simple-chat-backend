@@ -4,8 +4,8 @@ import AuthService from "../services/authServices";
 const authController = async (req: Request, res: Response) => {
 
     const { email } = req.body
-    const userExists = await AuthService.prototype.checkUserExist(email)
-    res.send(userExists)
+    const userExists = await AuthService.checkUserExist(email)
+    res.send(userExists.rows)
 }
 
 
