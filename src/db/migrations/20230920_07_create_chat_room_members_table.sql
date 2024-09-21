@@ -1,3 +1,5 @@
+CREATE TYPE chat_role_enum AS ENUM ('member','admin');
+
 CREATE TABLE IF NOT EXISTS chat_room_members (
     id SERIAL PRIMARY KEY,
     chat_room_id INT REFERENCES chat_rooms(id) ON DELETE CASCADE,

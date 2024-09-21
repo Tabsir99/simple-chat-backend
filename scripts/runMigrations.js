@@ -25,10 +25,13 @@ const runMigrations = async () => {
 
   const migrationFiles = fs.readdirSync(path.join(__dirname, '../src/db/migrations')).sort();
 
-  for (const migrationFile of migrationFiles) {
-    const sql = fs.readFileSync(path.join(__dirname, '../src/db/migrations', migrationFile), 'utf8');
-    
-    try {
+  try {
+    // Start a transaction
+    await client.query('BEGIN');
+
+    for (const migrationFile of migrationFiles) {
+      const sql = fs.readFileSync(path.join(__dirname, '../src/db/migrations', migrationFile), 'utf8');
+      
       const res = await client.query('SELECT * FROM migrations WHERE migration_file = $1', [migrationFile]);
       if (res.rows.length === 0) {
         await client.query(sql);
@@ -37,15 +40,19 @@ const runMigrations = async () => {
       } else {
         console.log(`Migration ${migrationFile} already applied.`);
       }
-    } catch (err) {
-      console.error(`Error running migration ${migrationFile}:`, err);
-      await client.end();
-      return;
     }
-  }
 
-  await client.end();
+    // Commit the transaction
+    await client.query('COMMIT');
+  } catch (err) {
+    // Rollback the transaction on error
+    console.error(`Error running migrations:`, err);
+    await client.query('ROLLBACK');
+  } finally {
+    await client.end();
+  }
 };
+
 
 // Rollback function
 const rollbackMigration = async (migrationFile) => {

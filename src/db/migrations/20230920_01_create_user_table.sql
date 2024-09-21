@@ -1,3 +1,5 @@
+CREATE TYPE user_status_enum AS ENUM ('online', 'offline', 'away');
+
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) NOT NULL,
@@ -10,7 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 
-CREATE TYPE user_status_enum AS ENUM ('online', 'offline', 'away');
+
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
