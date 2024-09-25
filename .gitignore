@@ -66,3 +66,5 @@ Thumbs.db
 
 # Optional: Uncomment if using a local db
 # *.sqlite
+
+temp
