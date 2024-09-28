@@ -1,0 +1,203 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  offline
+  online
+  away
+}
+
+enum MessageType {
+  text
+  image
+  video
+  audio
+  file
+}
+
+enum FriendshipStatus {
+  pending
+  accepted
+  rejected
+}
+
+enum ChatRole {
+  member
+  admin
+}
+
+enum ActivityType {
+  newMessage
+  friendRequestRejected
+  friendRequestAccepted
+  groupMessage
+}
+
+model User {
+  userId         String     @id @default(uuid()) @db.Uuid
+  username       String     @db.VarChar(50)
+  email          String     @unique @db.VarChar(200)
+  createdAt      DateTime   @default(now()) @db.Timestamp(6)
+  profilePicture String?    @db.VarChar(250)
+  
+  lastActive     DateTime?  @db.Timestamp(6)
+  userStatus     UserStatus @default(offline)
+  bio            String?    @db.VarChar(500)
+
+  messages       Message[] // One-to-many relationship with messages
+  MessageReceipt MessageReceipt[]
+  ChatRoomMember ChatRoomMember[]
+
+  friendships1    Friendship[]      @relation("User1Friendships")
+  friendships2    Friendship[]      @relation("User2Friendships")
+  MessageReaction MessageReaction[]
+
+  activities         RecentActivity[] @relation("UserActivities") // For activities where the user is involved
+  targetedActivities RecentActivity[] @relation("TargetUserActivities") // For activities where the user is the target
+
+  @@index([email])
+  @@index([username])
+  @@index([lastActive])
+}
+
+model ChatRoom {
+  chatRoomId   String    @id @default(uuid()) @db.Uuid
+  isGroup      Boolean   @default(false)
+  roomName     String?   @db.VarChar(100)
+  createdAt    DateTime  @default(now()) @db.Timestamp(6)
+  lastActivity DateTime? @db.Timestamp(6)
+
+  messages       Message[] // One-to-many relationship with messages
+  ChatRoomMember ChatRoomMember[]
+
+  recentActivities RecentActivity[] @relation("RecentActivityChatRoom") // For regular chat room activities
+  groupActivities  RecentActivity[] @relation("RecentActivityGroupChat")
+
+  @@index([lastActivity])
+}
+
+model Message {
+  messageId       String   @id @default(uuid()) @db.Uuid
+  chatRoomId      String   @db.Uuid // Foreign key referencing ChatRoom
+  senderId        String   @db.Uuid // Foreign key referenc User
+  content         String   @db.VarChar(2000)
+  parentMessageId String?  @db.Uuid // Nullable foreign key for replies
+  createdAt       DateTime @default(now()) @db.Timestamp(6)
+  isRead          Boolean  @default(false)
+  isDeleted       Boolean  @default(false)
+
+  // Relations
+  chatRoom      ChatRoom @relation(fields: [chatRoomId], references: [chatRoomId], onDelete: Cascade)
+  sender        User     @relation(fields: [senderId], references: [userId], onDelete: Cascade)
+  parentMessage Message? @relation("MessageReplies", fields: [parentMessageId], references: [messageId])
+
+  replies         Message[]         @relation("MessageReplies") // For replies to a message
+  Attachment      Attachment[]
+  MessageReceipt  MessageReceipt[]
+  MessageReaction MessageReaction[]
+}
+
+model Attachment {
+  attachmentId String   @id @default(uuid()) @db.Uuid
+  fileUrl      String   @db.Char(500)
+  createdAt    DateTime @default(now()) @db.Timestamp(6)
+  messageId    String   @db.Uuid
+
+  message Message @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model MessageReceipt {
+  receiptId String   @id @default(uuid()) @db.Uuid
+  messageId String   @db.Uuid
+  userId    String   @db.Uuid
+  readAt    DateTime @default(now()) @db.Timestamp(6)
+
+  message Message @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([readAt])
+}
+
+model Friendship {
+  friendshipId String           @id @default(uuid()) @db.Uuid
+  userId1      String           @db.Uuid // Foreign key referencing User
+  userId2      String           @db.Uuid // Foreign key referencing User
+  status       FriendshipStatus @default(pending)
+  createdAt    DateTime         @default(now())
+
+  // Relations
+  user1 User @relation("User1Friendships", fields: [userId1], references: [userId])
+  user2 User @relation("User2Friendships", fields: [userId2], references: [userId])
+  // @@check(userId1 < userId2) // Note: Prisma does not support CHECK constraints directly
+
+  @@unique([userId1, userId2])
+}
+
+model ChatRoomMember {
+  chatRoomMemberId String    @id @default(uuid()) @db.Uuid
+  chatRoomId       String    @db.Uuid // Foreign key referencing ChatRoom
+  userId           String    @db.Uuid // Foreign key referencing User
+  userRole         ChatRole  @default(member)
+  joinedAt         DateTime  @default(now()) @db.Timestamp(6)
+  muteUntil        DateTime? @db.Timestamp(6) // Nullable timestamp
+
+  // Relations
+  chatRoom ChatRoom @relation(fields: [chatRoomId], references: [chatRoomId], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  // Indexes and Unique Constraints
+  @@unique([chatRoomId, userId]) // Ensures unique membership per chat room
+  @@index([chatRoomId]) // Index on chatRoomId for quick lookups
+  @@index([userId]) // Index on userId for quick lookups
+  @@index([muteUntil]) // Index on muteUntil to efficiently check muted members
+}
+
+model MessageReaction {
+  messageReactionId String   @id @default(uuid()) @db.Uuid
+  messageId         String   @db.Uuid // Foreign key referencing Message
+  userId            String   @db.Uuid // Foreign key referencing User
+  reactionType      String   @db.VarChar(20)
+  createdAt         DateTime @default(now()) @db.Timestamp(6)
+
+  // Relations
+  message Message @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([messageId, userId, reactionType]) // Ensure unique combination of message, user, and reaction
+  @@index([messageId])
+  @@index([userId])
+}
+
+model RecentActivity {
+  recentActivityId Int          @id @default(autoincrement())
+  userId           String       @db.Uuid // Foreign key referencing User
+  activityType     ActivityType // Enum for activity types
+  chatRoomId       String?      @db.Uuid // Optional field for chat room
+  groupChatId      String?      @db.Uuid // Optional field for group chat
+  targetUserId     String?      @db.Uuid // Optional field if another user is involved
+  description      String?      @db.Text
+  createdAt        DateTime     @default(now()) @db.Timestamp(6)
+
+  // Relations
+  user       User      @relation("UserActivities", fields: [userId], references: [userId])
+  targetUser User?     @relation("TargetUserActivities", fields: [targetUserId], references: [userId]) // Another relation to User
+  chatRoom   ChatRoom? @relation("RecentActivityChatRoom", fields: [chatRoomId], references: [chatRoomId]) // Named relation to ChatRoom
+  groupChat  ChatRoom? @relation("RecentActivityGroupChat", fields: [groupChatId], references: [chatRoomId])
+
+  @@index([userId, createdAt]) // Index on userId and createdAt for better query performance
+}

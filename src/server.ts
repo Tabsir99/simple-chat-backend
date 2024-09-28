@@ -1,14 +1,14 @@
 import express from "express";
 import cors from "cors";
-import authRoute from "./routes/authRoute";
-import config from "./config/env";
+import config from "./common/config/env";
 import cookieParser from "cookie-parser";
 import EventEmitter from "events";
+import authRoute from "./modules/authentication/auth.routes";
+
 
 const emmiter = new EventEmitter();
 
 console.log(emmiter.getMaxListeners(), emmiter.eventNames());
-
 
 const app = express();
 app.use(express.json());
