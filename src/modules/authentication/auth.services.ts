@@ -53,11 +53,6 @@ export default class AuthService implements IAuthService {
 
     }
 
-    const accessToken = await this.generateAccessToken(
-      userData.userId,
-      "1h",
-      this.configService.get("jwtSecretAccess")
-    );
     const refreshToken = this.generateRefreshToken();
     await this.authRepository.saveToken(
       `refreshToken:${refreshToken}`,
@@ -67,7 +62,7 @@ export default class AuthService implements IAuthService {
 
     return this.responseFormatter.formatSuccessResponse({
       message: "Token created",
-      data: { accessToken, refreshToken },
+      data: { refreshToken },
     });
   }
 
@@ -191,10 +186,9 @@ export default class AuthService implements IAuthService {
   }
 
   public verifyOrRefreshToken = async (
-    accessToken: string,
     refreshToken: string
-  ): Promise<string | boolean> => {
-    if (!accessToken && refreshToken) {
+  ): Promise<string> => {
+    if (refreshToken) {
       const isValid = await this.authRepository.getToken(
         `refreshToken:${refreshToken}`
       );
@@ -205,21 +199,14 @@ export default class AuthService implements IAuthService {
 
       const newAccessToken = await this.generateAccessToken(
         isValid,
-        "1h",
+        "30m",
         this.configService.get("jwtSecretAccess")
       );
       return newAccessToken;
     }
-    try {
-      await jwtVerify(
-        accessToken,
-        new TextEncoder().encode(this.configService.get("jwtSecretAccess"))
-
-      );
-
-      return true
-    } catch (error) {
-       throw new Error("Invalid AccessToken");
+    else{
+        throw new Error("Refresh Token not provided")
     }
+    
   };
 }

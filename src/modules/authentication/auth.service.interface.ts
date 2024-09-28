@@ -4,7 +4,6 @@ import {
 } from "../../common/utils/responseFormatter";
 
 export interface AccessTokenData {
-  accessToken: string;
   refreshToken: string;
 }
 

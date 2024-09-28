@@ -10,6 +10,6 @@ authRoute.get("/auth/login", authController.loginWithEmail);
 authRoute.get("/auth/google", authController.redirectToGoogleAuth);
 authRoute.get("/auth/google/callback", authController.handleGoogleAuthCallback);
 authRoute.get("/auth/logout",authController.logout)
-authRoute.get("/auth/verify-refresh", authController.verifyOrRefresh)
+authRoute.post("/auth/verify-refresh", authController.verifyOrRefresh)
 
 export default authRoute;
