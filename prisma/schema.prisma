@@ -30,7 +30,7 @@ enum MessageType {
 enum FriendshipStatus {
   pending
   accepted
-  rejected
+  blocked
 }
 
 enum ChatRole {
@@ -46,15 +46,16 @@ enum ActivityType {
 }
 
 model User {
-  userId         String     @id @default(uuid()) @db.Uuid
-  username       String     @db.VarChar(50)
-  email          String     @unique @db.VarChar(200)
-  createdAt      DateTime   @default(now()) @db.Timestamp(6)
-  profilePicture String?    @db.VarChar(250)
-  
-  lastActive     DateTime?  @db.Timestamp(6)
-  userStatus     UserStatus @default(offline)
-  bio            String?    @db.VarChar(500)
+  userId         String   @id @default(uuid()) @db.Uuid
+  username       String   @db.VarChar(50)
+  email          String   @unique @db.VarChar(200)
+  title          String?  @db.VarChar(100)
+  createdAt      DateTime @default(now()) @db.Timestamp(6)
+  profilePicture String?  @db.VarChar(250)
+  bio            String?  @db.VarChar(500)
+
+  lastActive DateTime?  @db.Timestamp(6)
+  userStatus UserStatus @default(offline)
 
   messages       Message[] // One-to-many relationship with messages
   MessageReceipt MessageReceipt[]
@@ -68,20 +69,21 @@ model User {
   targetedActivities RecentActivity[] @relation("TargetUserActivities") // For activities where the user is the target
 
   @@index([email])
-  @@index([username])
   @@index([lastActive])
 }
 
 model ChatRoom {
-  chatRoomId   String    @id @default(uuid()) @db.Uuid
-  isGroup      Boolean   @default(false)
-  roomName     String?   @db.VarChar(100)
-  createdAt    DateTime  @default(now()) @db.Timestamp(6)
-  lastActivity DateTime? @db.Timestamp(6)
+  chatRoomId    String    @id @default(uuid()) @db.Uuid
+  isGroup       Boolean   @default(false)
+  roomName      String?   @db.VarChar(100)
+  createdAt     DateTime  @default(now()) @db.Timestamp(6)
+  lastActivity  DateTime? @db.Timestamp(6)
+  lastMessageId String?   @db.Uuid
 
   messages       Message[] // One-to-many relationship with messages
   ChatRoomMember ChatRoomMember[]
 
+  lastMessage      Message?         @relation("LastMessage", fields: [lastMessageId], references: [messageId])
   recentActivities RecentActivity[] @relation("RecentActivityChatRoom") // For regular chat room activities
   groupActivities  RecentActivity[] @relation("RecentActivityGroupChat")
 
@@ -107,6 +109,8 @@ model Message {
   Attachment      Attachment[]
   MessageReceipt  MessageReceipt[]
   MessageReaction MessageReaction[]
+
+  lastMessageFor ChatRoom[] @relation("LastMessage")
 }
 
 model Attachment {
@@ -138,12 +142,12 @@ model Friendship {
   userId1      String           @db.Uuid // Foreign key referencing User
   userId2      String           @db.Uuid // Foreign key referencing User
   status       FriendshipStatus @default(pending)
+  senderId     String           @db.Uuid
   createdAt    DateTime         @default(now())
 
   // Relations
   user1 User @relation("User1Friendships", fields: [userId1], references: [userId])
   user2 User @relation("User2Friendships", fields: [userId2], references: [userId])
-  // @@check(userId1 < userId2) // Note: Prisma does not support CHECK constraints directly
 
   @@unique([userId1, userId2])
 }
@@ -155,10 +159,10 @@ model ChatRoomMember {
   userRole         ChatRole  @default(member)
   joinedAt         DateTime  @default(now()) @db.Timestamp(6)
   muteUntil        DateTime? @db.Timestamp(6) // Nullable timestamp
-
+  unreadCount      Int       @default(0)
   // Relations
-  chatRoom ChatRoom @relation(fields: [chatRoomId], references: [chatRoomId], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  chatRoom         ChatRoom  @relation(fields: [chatRoomId], references: [chatRoomId], onDelete: Cascade)
+  user             User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   // Indexes and Unique Constraints
   @@unique([chatRoomId, userId]) // Ensures unique membership per chat room

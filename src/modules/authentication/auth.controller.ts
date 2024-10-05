@@ -1,15 +1,18 @@
 import { Request, Response } from "express";
 import AuthService from "./auth.services";
-import { ResponseFormatter } from "../../common/utils/responseFormatter";
-import { ConfigService } from "../../common/config/env";
-import { CookieManager } from "../../common/utils/cookieManager";
+import { IConfigService } from "../../common/config/env";
+import { ICookieManager } from "../../common/utils/cookieManager";
+import { inject, injectable } from "inversify";
+import { TYPES } from "../../inversify/types";
+import { formatResponse } from "../../common/utils/responseFormatter";
 
+
+@injectable()
 export default class AuthController {
   constructor(
-    private authService: AuthService,
-    private responseFormatter: ResponseFormatter,
-    private config: ConfigService,
-    private cookieManager: CookieManager
+    @inject(TYPES.AuthService) private authService: AuthService,
+    @inject(TYPES.ConfigService) private config: IConfigService,
+    @inject(TYPES.CookieManager) private cookieManager: ICookieManager
   ) {}
 
   public redirectToGoogleAuth = (_: Request, res: Response): void => {
@@ -38,21 +41,26 @@ export default class AuthController {
     const { token } = req.query;
     if (!token || typeof token !== "string") {
       return res.status(400).json(
-        this.responseFormatter.formatErrorResponse({
+        formatResponse({
           message: "Invalid or missing token",
-          statusCode: 400,
+          success: false,
         })
       );
     }
 
-    const response = await this.authService.emailLogIn(token);
-
-    if ("data" in response) {
-      const { refreshToken } = response.data;
-      this.cookieManager.setAuthCookies(res, { refreshToken });
-      return res.redirect(this.config.get("baseUrlFrontend") + "/chats");
-    } else {
-      return res.status(403).json(response);
+    try {
+      const response = await this.authService.emailLogIn(token);
+  
+      if (response.refreshToken) {
+        const { refreshToken } = response;
+        this.cookieManager.setAuthCookies(res, { refreshToken });
+        return res.redirect(this.config.get("baseUrlFrontend") + "/chats");
+      } else {
+        return res.status(403).json(formatResponse({ success: false, message: "Refresh Token generation failed" }));
+      }
+    } catch (error) {
+      console.log(error ," FROM LOGIN WITH EMAIL")
+      return res.json(formatResponse({ success: false, message: "Internal Error Occured" }))
     }
   };
 
@@ -67,32 +75,45 @@ export default class AuthController {
 
     try {
       const response = await this.authService.googleLogIn(code);
-      if ("data" in response) {
+
+      // console.log("Response recivied from googleLogin ,",response)
+      if (response.refreshToken) {
         this.cookieManager.setAuthCookies(res, {
-          refreshToken: response.data.refreshToken,
+          refreshToken: response.refreshToken,
         });
+
+        // console.log("Cookie set ,redirecting....")
         return res.redirect(`${this.config.get("baseUrlFrontend")}/chats`);
       }
     } catch (err) {
       console.error("Authentication failed:", err);
-      return res.status(401).json({ error: "Authentication failed" });
+      return res.status(401).json(formatResponse({ success: false, message: "Authentication failed" }));
     }
     return res.status(500).json({ err: "Internal porblem" });
   };
 
   public verifyOrRefresh = async (req: Request, res: Response) => {
     const refreshToken: string = req.cookies["refreshToken"];
-
+    
+    // console.log("Verify-refresh controller running... \n")
     try {
-      const newAccessToken = await this.authService.verifyOrRefreshToken(
+      const { newAccessToken, newRefreshToken } = await this.authService.verifyOrRefreshToken(
         refreshToken
       );
+
+      // console.log("Refresh token verification succssfull, setting up cookie... \n")
+      this.cookieManager.setAuthCookies(res,{
+        refreshToken: newRefreshToken,
+      })
+
 
       return res.json({
         message: "New Token Issued",
         accessToken: newAccessToken,
       });
     } catch (error) {
+      console.log("FROM VERIFY OR REFRESH ",error instanceof Error?error.message:"")
+      // await this.authService.deleteRefreshToken(refreshToken)
       this.cookieManager.clearAuthCookies(res);
       return res.status(401).json({
         message: "Token Verification failed",
@@ -100,9 +121,13 @@ export default class AuthController {
     }
   };
 
-  public logout = (_: Request, res: Response) => {
+  public logout = async (req: Request, res: Response) => {
+    const refreshToken: string = req.cookies["refreshToken"];
+
+    await this.authService.deleteRefreshToken(refreshToken);
     this.cookieManager.clearAuthCookies(res);
-    res.json({
+
+    res.status(200).json({
       message: "User logged out",
     });
   };

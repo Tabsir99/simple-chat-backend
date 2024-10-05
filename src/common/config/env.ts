@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { injectable } from "inversify";
 
 dotenv.config();
 
@@ -35,6 +36,9 @@ export interface IConfigService {
   isProduction(): boolean;
 }
 
+
+
+@injectable()
 
 export class ConfigService implements IConfigService {
   public get(key: ConfigKey): string {

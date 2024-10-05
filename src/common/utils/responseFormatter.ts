@@ -1,32 +1,36 @@
-export interface SuccessResponse<T> {
-  message: string;
-  data: T;
+type ApiResponse = {
+  success: boolean;
+  message?: string
+  meta: {
+    timestamp: string;
+    version: "1.0";
+  };
+  data?: any;
+  error?: any;
+};
+
+type FormatResponseProps = {
+  success: boolean,
+  data?: any,
+  error?: any,
+  message?: string
 }
 
-export interface ErrorResponse {
-  message: string;
-  statusCode: number;
-}
+export function formatResponse({success, message, data = null, error = null}: FormatResponseProps): ApiResponse {
+  const response: ApiResponse = {
+    success,
+    message,
+    meta: {
+      timestamp: new Date().toISOString(),
+      version: "1.0",
+    },
+  };
 
-export interface IResponseFormatter {
-  formatSuccessResponse<T>(response: SuccessResponse<T>): SuccessResponse<T>;
-  formatErrorResponse(error: ErrorResponse): ErrorResponse;
-}
-
-export class ResponseFormatter implements IResponseFormatter {
-  public formatSuccessResponse<T>(response: SuccessResponse<T>): SuccessResponse<T> {
-    return {
-      message: response.message,
-      data: response.data,
-    };
+  if (success) {
+    response.data = data;
+  } else {
+    response.error = error;
   }
 
-  public formatErrorResponse(error: ErrorResponse): ErrorResponse {
-    return {
-      message: error.message,
-      statusCode: error.statusCode,
-    };
-  }
+  return response;
 }
-
-export const responseFormatter = new ResponseFormatter()

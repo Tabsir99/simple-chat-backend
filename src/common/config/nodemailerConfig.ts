@@ -2,11 +2,14 @@ import nodemailer from "nodemailer";
 import config from "./env";
 import { generateUsernameFromEmail } from "../utils/utils";
 import verificationEmailTemplate from "../templates/verificationTemplate";
+import { injectable } from "inversify";
 
 export interface IEmailService {
   sendVerificationEmail(email: string, link: string): Promise<void>;
 }
 
+
+@injectable()
 export class EmailService implements IEmailService {
   private transporter;
 

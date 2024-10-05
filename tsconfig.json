@@ -1,12 +1,12 @@
 {
   "compilerOptions": {
-    "target": "ES2016",
-    "module": "ES6",
+    "target": "ESNext",
+    "module": "ESNext",
     "rootDir": "src/",
     "outDir": "./dist",
     "sourceMap": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node",
+    "moduleResolution": "node", 
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
@@ -18,12 +18,13 @@
     "strictPropertyInitialization": true,
     "noImplicitThis": true,
     "alwaysStrict": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": true,
+    "noUnusedLocals": false, // Should be true
+    "noUnusedParameters": false, // Needs to be true
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-  },
+    "experimentalDecorators": true, 
+    "emitDecoratorMetadata": true,
+  }, 
   "include": ["src/**/*"],
-  "exclude": ["node_modules","dist", "**/*.spec.ts"],
-  
-}
+  "exclude": ["node_modules","dist", "**/*.spec.ts","**/*test*.ts*"],
+} 

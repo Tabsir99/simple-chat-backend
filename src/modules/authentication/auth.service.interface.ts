@@ -1,7 +1,4 @@
-import {
-  SuccessResponse,
-  ErrorResponse,
-} from "../../common/utils/responseFormatter";
+
 
 export interface AccessTokenData {
   refreshToken: string;
@@ -10,21 +7,22 @@ export interface AccessTokenData {
 export interface IAuthService {
   sendVerificationEmail(
     email: string
-  ): Promise<SuccessResponse<{}> | ErrorResponse>;
+  ): Promise<any>;
   emailLogIn(
     token: string
-  ): Promise<SuccessResponse<AccessTokenData> | ErrorResponse>;
+  ): Promise<{refreshToken: string | null}>;
   googleLogIn(
     code: string
-  ): Promise<SuccessResponse<AccessTokenData> | ErrorResponse>;
+  ): Promise<{refreshToken: string | null}>;
   verifyOrRefreshToken(
     accessToken: string,
     refreshToken: string
-  ): Promise<string | boolean>;
+  ): Promise<{newAccessToken: string, newRefreshToken: string} | boolean>;
 }
 
 export interface IAuthRepository {
   saveToken(token: string, email: string, expirationTime: number): Promise<void>;
-  getToken(token: string): Promise<string | null>;
+  getToken(token: string): Promise<[error: Error | null, result: unknown][] | null | null>;
   deleteToken(token: string): Promise<void>;
+  rotateToken(oldToken: string, newToken: string, value:string, ttl: number): Promise<void>;
 }

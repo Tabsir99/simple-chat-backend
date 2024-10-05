@@ -5,7 +5,7 @@ CREATE TYPE "UserStatus" AS ENUM ('offline', 'online', 'away');
 CREATE TYPE "MessageType" AS ENUM ('text', 'image', 'video', 'audio', 'file');
 
 -- CreateEnum
-CREATE TYPE "FriendshipStatus" AS ENUM ('pending', 'accepted', 'rejected');
+CREATE TYPE "FriendshipStatus" AS ENUM ('pending', 'accepted', 'blocked');
 
 -- CreateEnum
 CREATE TYPE "ChatRole" AS ENUM ('member', 'admin');
@@ -18,11 +18,12 @@ CREATE TABLE "User" (
     "userId" UUID NOT NULL,
     "username" VARCHAR(50) NOT NULL,
     "email" VARCHAR(200) NOT NULL,
+    "title" VARCHAR(100),
     "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "profilePicture" VARCHAR(250),
+    "bio" VARCHAR(500),
     "lastActive" TIMESTAMP(6),
     "userStatus" "UserStatus" NOT NULL DEFAULT 'offline',
-    "bio" VARCHAR(500),
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("userId")
 );
@@ -34,6 +35,7 @@ CREATE TABLE "ChatRoom" (
     "roomName" VARCHAR(100),
     "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "lastActivity" TIMESTAMP(6),
+    "lastMessageId" UUID,
 
     CONSTRAINT "ChatRoom_pkey" PRIMARY KEY ("chatRoomId")
 );
@@ -78,6 +80,7 @@ CREATE TABLE "Friendship" (
     "userId1" UUID NOT NULL,
     "userId2" UUID NOT NULL,
     "status" "FriendshipStatus" NOT NULL DEFAULT 'pending',
+    "senderId" UUID NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Friendship_pkey" PRIMARY KEY ("friendshipId")
@@ -91,6 +94,7 @@ CREATE TABLE "ChatRoomMember" (
     "userRole" "ChatRole" NOT NULL DEFAULT 'member',
     "joinedAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "muteUntil" TIMESTAMP(6),
+    "unreadCount" INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT "ChatRoomMember_pkey" PRIMARY KEY ("chatRoomMemberId")
 );
@@ -125,9 +129,6 @@ CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
 
 -- CreateIndex
 CREATE INDEX "User_email_idx" ON "User"("email");
-
--- CreateIndex
-CREATE INDEX "User_username_idx" ON "User"("username");
 
 -- CreateIndex
 CREATE INDEX "User_lastActive_idx" ON "User"("lastActive");
@@ -170,6 +171,9 @@ CREATE UNIQUE INDEX "MessageReaction_messageId_userId_reactionType_key" ON "Mess
 
 -- CreateIndex
 CREATE INDEX "RecentActivity_userId_createdAt_idx" ON "RecentActivity"("userId", "createdAt");
+
+-- AddForeignKey
+ALTER TABLE "ChatRoom" ADD CONSTRAINT "ChatRoom_lastMessageId_fkey" FOREIGN KEY ("lastMessageId") REFERENCES "Message"("messageId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Message" ADD CONSTRAINT "Message_chatRoomId_fkey" FOREIGN KEY ("chatRoomId") REFERENCES "ChatRoom"("chatRoomId") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -1,19 +1,28 @@
 import { Response } from "express";
 import { configService } from "../config/env";
+import { injectable } from "inversify";
 
+export interface ICookieManager {
+  setAuthCookies(res: Response, options: { refreshToken: string, exp?: number }): void;
+  clearAuthCookies(res: Response): void;
+}
+
+@injectable()
 export class CookieManager {
   setAuthCookies(
     res: Response,
-    { refreshToken }: { refreshToken: string }
+    {
+      refreshToken,
+      exp = 7 * 24 * 3600,
+    }: { refreshToken: string; exp: number }
   ) {
-
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       sameSite: "lax",
       secure: configService.isProduction(),
-      maxAge: 7 * 24 * 3600 * 1000,
+      maxAge: exp * 1000,
       domain: `.${configService.get("hostname")}`,
-      path: "/api/auth/verify-refresh"
+      path: "/api/auth",
     });
   }
 
@@ -22,13 +31,10 @@ export class CookieManager {
       httpOnly: true,
       sameSite: "lax",
       secure: configService.isProduction(),
-      path: "/api/auth/verify-refresh",
+      path: "/api/auth",
       domain: `.${configService.get("hostname")}`,
     });
-
-     
   }
-
 }
 
 export const cookieManager = new CookieManager();
