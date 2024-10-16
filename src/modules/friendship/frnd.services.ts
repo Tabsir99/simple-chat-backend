@@ -4,6 +4,7 @@ import { TYPES } from "../../inversify/types";
 import { $Enums } from "@prisma/client";
 import ChatServices from "../chats/chat.services";
 import redisClient from "../../common/config/redisConfig";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
 @injectable()
 export default class FriendshipService {
@@ -19,22 +20,24 @@ export default class FriendshipService {
       let friendshipStatus: {
         status: $Enums.FriendshipStatus;
         senderId: string;
+        blockedUserId: string | null;
       } | null = null;
       if (userId !== targetUserId) {
         friendshipStatus =
-          await this.friendshipRepository.findFriendshipByUsers(
+          await this.friendshipRepository.findFriendshipStatusByUsers(
             userId,
             targetUserId
           );
       }
 
-      let friendsCount = await this.getFriendList(userId);
+      let friendsCount = await this.getFriendIdList(userId);
 
       return {
         data: {
           status: friendshipStatus?.status || "",
           count: friendsCount?.length || 0,
           senderId: friendshipStatus?.senderId || "",
+          blockedUserId: friendshipStatus?.blockedUserId || "",
         },
         message: `Friendship status between ${userId} and ${targetUserId} found.`,
       };
@@ -48,53 +51,67 @@ export default class FriendshipService {
 
   handleFriendRequest = async (
     userId: string,
-    targetUserId: string,
-    status: "accepted" | "blocked" | "unblocked"
+    friendId: string,
+    status: "accepted" | "blocked" | ""
   ) => {
     try {
-      if (status === "unblocked") {
-        await this.friendshipRepository.deleteFriendship(userId, targetUserId);
+      if (status === "") {
+        const da = await this.friendshipRepository.deleteFriendship(
+          userId,
+          friendId
+        );
+
+        console.log(status, friendId, userId);
+        if (da.count === 0) {
+          return {
+            success: false,
+          };
+        }
         return {
           success: true,
-          message: "Unblocked successfully.",
-          status: "unblocked",
+          message: "Friendship removed",
         };
       }
 
-      const response = await this.friendshipRepository.updateFriendshipStatus(
-        userId,
-        targetUserId,
-        status
-      );
-
+      let response;
       if (status === "accepted") {
-        const result = await this.chatService.createChatRoom(
+        response = await this.friendshipRepository.acceptFriendship(
           userId,
-          targetUserId
+          friendId
         );
+
+        (async () => {
+          await redisClient.pipeline().del(`${userId}:friends`).del(`${friendId}:friends`).exec()
+        })();
       }
 
+      if (status === "blocked") {
+        response = await this.friendshipRepository.blockFriendship(
+          userId,
+          friendId
+        );
+      }
       return {
         success: true,
         message: `Friend request ${status} successfully.`,
-        status: response.status,
+        status: response?.status,
       };
     } catch (error) {
       console.log(error, "FROM FRND SERVICE HANDLE FRIEND REQUEST");
-      return {
-        success: false,
-        message: "An error occurred while processing the request.",
-        error: error, // Optionally include the error message
-      };
+      if (error instanceof PrismaClientKnownRequestError) {
+        return { code: error.code };
+      }
+      return { error };
     }
   };
 
   createFriendRequest = async (senderId: string, targetUserId: string) => {
     try {
-      const respo = await this.friendshipRepository.insertFriendRequest(
+      await this.friendshipRepository.insertFriendRequest(
         senderId,
         targetUserId
       );
+
       return true;
     } catch (error) {
       console.log(error, " FROM FRND SERVICE CREATE FRND REQ");
@@ -102,24 +119,25 @@ export default class FriendshipService {
     }
   };
 
-  getFriendList = async (userId: string) => {
+  getFriendIdList = async (userId: string) => {
     try {
-
-      let result: string[] | undefined
+      let result: string[] | undefined;
       const friendsCountCache = await redisClient.get(`${userId}:friends`);
 
       if (!friendsCountCache) {
         console.log("Friends fetched from database");
         const friendsCount =
-          await this.friendshipRepository.findAllFriendsByUser(userId);
+          await this.friendshipRepository.findAllFriendsIdByUser(userId);
 
         redisClient.setex(
           `${userId}:friends`,
           3600,
           JSON.stringify(friendsCount)
         );
+
+        result = friendsCount
       } else {
-        console.log("Fetched from the cache, friends");
+        // console.log("Fetched from the cache, friends");
         result = JSON.parse(friendsCountCache);
       }
       return result;
@@ -127,5 +145,31 @@ export default class FriendshipService {
       console.log(error);
       return undefined;
     }
+  };
+
+  getFriendList = async (userId: string) => {
+    const friendList = await this.friendshipRepository.findAllConnectionsByUser(
+      userId
+    );
+
+    const formattedFriendList = friendList.map((friend) => {
+      if (friend.blockedUserId === userId) {
+        return null;
+      }
+      let friendObj = {
+        isCurrentUserSender: friend.senderId === userId,
+        status: friend.status,
+        isBlocked: friend.blockedUserId === userId,
+      };
+      if (friend.user1.userId !== userId) {
+        friendObj = { ...friendObj, ...friend.user1 };
+      }
+      if (friend.user2.userId !== userId) {
+        friendObj = { ...friendObj, ...friend.user2 };
+      }
+      return friendObj;
+    });
+
+    return formattedFriendList;
   };
 }

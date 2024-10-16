@@ -177,6 +177,8 @@ export default class AuthService implements IAuthService {
         `refreshToken:${refreshToken}`
       );
 
+      // console.log(`Provided refresh toekn:${refreshToken.slice(0,10)}\ntime:${new Date().toISOString()}`)
+
       // console.log("Verifyorrefresh service running, ",isValid)
       if (!isValid) {
         throw new Error("Invalid Refresh Token, from getToken");
@@ -190,13 +192,13 @@ export default class AuthService implements IAuthService {
 
       const newAccessToken = await this.generateAccessToken(
         { userId: tokenValue },
-        "30m",
+        "20m",
         this.configService.get("jwtSecretAccess")
       );
 
       const newRefreshToken = this.generateRefreshToken();
 
-      // console.log(`new refresh tokne generated, \nold:${refreshToken}\n new:${newRefreshToken}\n`)
+      // console.log(`new refresh tokne generated, \nold:${refreshToken.slice(0,10)}\n new:${newRefreshToken.slice(0,10)}\n${new Date().toISOString()}`)
       await this.authRepository.rotateToken(
         `refreshToken:${refreshToken}`,
         `refreshToken:${newRefreshToken}`,

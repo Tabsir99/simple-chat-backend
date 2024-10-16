@@ -66,6 +66,7 @@ export default class ChatRepository {
         data: {},
         select: {
           chatRoomId: true,
+          
         },
       });
       const chatRoomMembers = await prisma.chatRoomMember.createMany({
@@ -74,6 +75,7 @@ export default class ChatRepository {
             chatRoomId: chatRoom.chatRoomId,
             userId: userId1,
             userRole: "member",
+
           },
           {
             chatRoomId: chatRoom.chatRoomId,

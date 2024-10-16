@@ -38,11 +38,27 @@ enum ChatRole {
   admin
 }
 
-enum ActivityType {
-  newMessage
-  friendRequestRejected
-  friendRequestAccepted
-  groupMessage
+enum FileType {
+  image
+  video
+  document
+}
+
+enum MessageStatus {
+  sent
+  delivered
+  read
+  failed
+}
+
+enum ReactionType {
+  thumbs_up
+  heart
+  smile
+  celebration
+  haha
+  thinking
+  angry
 }
 
 model User {
@@ -57,16 +73,15 @@ model User {
   lastActive DateTime?  @db.Timestamp(6)
   userStatus UserStatus @default(offline)
 
-  messages       Message[] // One-to-many relationship with messages
-  MessageReceipt MessageReceipt[]
-  ChatRoomMember ChatRoomMember[]
-
-  friendships1    Friendship[]      @relation("User1Friendships")
-  friendships2    Friendship[]      @relation("User2Friendships")
+  ChatRoomMember  ChatRoomMember[]
+  Friendships1    Friendship[]      @relation("User1Friendships")
+  Friendships2    Friendship[]      @relation("User2Friendships")
+  Sender          Friendship[]      @relation("senderFriendships")
+  BlockedUser     Friendship[]      @relation("blockedUserFriendships")
   MessageReaction MessageReaction[]
-
-  activities         RecentActivity[] @relation("UserActivities") // For activities where the user is involved
-  targetedActivities RecentActivity[] @relation("TargetUserActivities") // For activities where the user is the target
+  RecentActivity  RecentActivity?
+  ChatRoom        ChatRoom[]
+  Message         Message[]
 
   @@index([email])
   @@index([lastActive])
@@ -79,43 +94,44 @@ model ChatRoom {
   createdAt     DateTime  @default(now()) @db.Timestamp(6)
   lastActivity  DateTime? @db.Timestamp(6)
   lastMessageId String?   @db.Uuid
+  createdBy     String?    @db.Uuid
 
-  messages       Message[] // One-to-many relationship with messages
+  Messages       Message[] // One-to-many relationship with messages
   ChatRoomMember ChatRoomMember[]
 
-  lastMessage      Message?         @relation("LastMessage", fields: [lastMessageId], references: [messageId])
-  recentActivities RecentActivity[] @relation("RecentActivityChatRoom") // For regular chat room activities
-  groupActivities  RecentActivity[] @relation("RecentActivityGroupChat")
+  lastMessage Message? @relation("LastMessage", fields: [lastMessageId], references: [messageId])
+  creator     User?     @relation(fields: [createdBy], references: [userId])
 
   @@index([lastActivity])
 }
 
 model Message {
-  messageId       String   @id @default(uuid()) @db.Uuid
-  chatRoomId      String   @db.Uuid // Foreign key referencing ChatRoom
-  senderId        String   @db.Uuid // Foreign key referenc User
-  content         String   @db.VarChar(2000)
-  parentMessageId String?  @db.Uuid // Nullable foreign key for replies
-  createdAt       DateTime @default(now()) @db.Timestamp(6)
-  isRead          Boolean  @default(false)
-  isDeleted       Boolean  @default(false)
+  messageId       String        @id @default(uuid()) @db.Uuid
+  chatRoomId      String        @db.Uuid
+  senderId        String        @db.Uuid
+  content         String        @db.VarChar(2000)
+  parentMessageId String?       @db.Uuid
+  createdAt       DateTime      @default(now()) @db.Timestamp(6)
+  isDeleted       Boolean       @default(false)
+  status          MessageStatus @default(sent)
 
   // Relations
   chatRoom      ChatRoom @relation(fields: [chatRoomId], references: [chatRoomId], onDelete: Cascade)
   sender        User     @relation(fields: [senderId], references: [userId], onDelete: Cascade)
   parentMessage Message? @relation("MessageReplies", fields: [parentMessageId], references: [messageId])
 
-  replies         Message[]         @relation("MessageReplies") // For replies to a message
+  Replies         Message[]         @relation("MessageReplies")
   Attachment      Attachment[]
   MessageReceipt  MessageReceipt[]
   MessageReaction MessageReaction[]
 
-  lastMessageFor ChatRoom[] @relation("LastMessage")
+  LastMessageFor ChatRoom[] @relation("LastMessage")
 }
 
 model Attachment {
   attachmentId String   @id @default(uuid()) @db.Uuid
   fileUrl      String   @db.Char(500)
+  fileType     FileType
   createdAt    DateTime @default(now()) @db.Timestamp(6)
   messageId    String   @db.Uuid
 
@@ -125,58 +141,62 @@ model Attachment {
 }
 
 model MessageReceipt {
-  receiptId String   @id @default(uuid()) @db.Uuid
-  messageId String   @db.Uuid
-  userId    String   @db.Uuid
-  readAt    DateTime @default(now()) @db.Timestamp(6)
+  receiptId         String   @id @default(uuid()) @db.Uuid
+  lastReadMessageId String   @db.Uuid
+  chatRoomMemberId  String   @db.Uuid
+  readAt            DateTime @default(now()) @db.Timestamp(6)
 
-  message Message @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  message        Message        @relation(fields: [lastReadMessageId], references: [messageId], onDelete: Cascade)
+  chatRoomMember ChatRoomMember @relation(fields: [chatRoomMemberId], references: [chatRoomMemberId], onDelete: Cascade)
 
-  @@unique([messageId, userId])
+  @@unique([lastReadMessageId, chatRoomMemberId])
   @@index([readAt])
 }
 
 model Friendship {
-  friendshipId String           @id @default(uuid()) @db.Uuid
-  userId1      String           @db.Uuid // Foreign key referencing User
-  userId2      String           @db.Uuid // Foreign key referencing User
-  status       FriendshipStatus @default(pending)
-  senderId     String           @db.Uuid
-  createdAt    DateTime         @default(now())
+  friendshipId  String           @id @default(uuid()) @db.Uuid
+  userId1       String           @db.Uuid // Foreign key referencing User
+  userId2       String           @db.Uuid // Foreign key referencing User
+  status        FriendshipStatus @default(pending)
+  senderId      String           @db.Uuid
+  blockedUserId String?          @db.Uuid
+  createdAt     DateTime         @default(now())
 
   // Relations
-  user1 User @relation("User1Friendships", fields: [userId1], references: [userId])
-  user2 User @relation("User2Friendships", fields: [userId2], references: [userId])
+  user1       User  @relation("User1Friendships", fields: [userId1], references: [userId])
+  user2       User  @relation("User2Friendships", fields: [userId2], references: [userId])
+  sender      User  @relation("senderFriendships", fields: [senderId], references: [userId])
+  blockedUser User? @relation("blockedUserFriendships", fields: [blockedUserId], references: [userId])
 
   @@unique([userId1, userId2])
 }
 
 model ChatRoomMember {
-  chatRoomMemberId String    @id @default(uuid()) @db.Uuid
-  chatRoomId       String    @db.Uuid // Foreign key referencing ChatRoom
-  userId           String    @db.Uuid // Foreign key referencing User
-  userRole         ChatRole  @default(member)
-  joinedAt         DateTime  @default(now()) @db.Timestamp(6)
-  muteUntil        DateTime? @db.Timestamp(6) // Nullable timestamp
-  unreadCount      Int       @default(0)
+  chatRoomMemberId String           @id @default(uuid()) @db.Uuid
+  chatRoomId       String           @db.Uuid // Foreign key referencing ChatRoom
+  userId           String           @db.Uuid // Foreign key referencing User
+  userRole         ChatRole         @default(member)
+  joinedAt         DateTime         @default(now()) @db.Timestamp(6)
+  muteUntil        DateTime?        @db.Timestamp(6) // Nullable timestamp
+  unreadCount      Int              @default(0)
+  nickName         String?          @db.VarChar(50)
   // Relations
-  chatRoom         ChatRoom  @relation(fields: [chatRoomId], references: [chatRoomId], onDelete: Cascade)
-  user             User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  chatRoom         ChatRoom         @relation(fields: [chatRoomId], references: [chatRoomId], onDelete: Cascade)
+  user             User             @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  MessageReceipt   MessageReceipt[]
 
   // Indexes and Unique Constraints
   @@unique([chatRoomId, userId]) // Ensures unique membership per chat room
   @@index([chatRoomId]) // Index on chatRoomId for quick lookups
-  @@index([userId]) // Index on userId for quick lookups
-  @@index([muteUntil]) // Index on muteUntil to efficiently check muted members
+  @@index([userId])
 }
 
 model MessageReaction {
-  messageReactionId String   @id @default(uuid()) @db.Uuid
-  messageId         String   @db.Uuid // Foreign key referencing Message
-  userId            String   @db.Uuid // Foreign key referencing User
-  reactionType      String   @db.VarChar(20)
-  createdAt         DateTime @default(now()) @db.Timestamp(6)
+  messageReactionId String       @id @default(uuid()) @db.Uuid
+  messageId         String       @db.Uuid // Foreign key referencing Message
+  userId            String       @db.Uuid // Foreign key referencing User
+  reactionType      ReactionType
+  createdAt         DateTime     @default(now()) @db.Timestamp(6)
 
   // Relations
   message Message @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
@@ -188,20 +208,15 @@ model MessageReaction {
 }
 
 model RecentActivity {
-  recentActivityId Int          @id @default(autoincrement())
-  userId           String       @db.Uuid // Foreign key referencing User
-  activityType     ActivityType // Enum for activity types
-  chatRoomId       String?      @db.Uuid // Optional field for chat room
-  groupChatId      String?      @db.Uuid // Optional field for group chat
-  targetUserId     String?      @db.Uuid // Optional field if another user is involved
-  description      String?      @db.Text
-  createdAt        DateTime     @default(now()) @db.Timestamp(6)
+  recentActivityId             String   @id @default(uuid()) @db.Uuid
+  userId                       String   @db.Uuid
+  totalNewFriendRequests       Int      @default(0)
+  totalNewUnseenChats          Int      @default(0)
+  unseenAcceptedFriendRequests Int      @default(0)
+  lastUpdated                  DateTime @default(now()) @updatedAt
 
-  // Relations
-  user       User      @relation("UserActivities", fields: [userId], references: [userId])
-  targetUser User?     @relation("TargetUserActivities", fields: [targetUserId], references: [userId]) // Another relation to User
-  chatRoom   ChatRoom? @relation("RecentActivityChatRoom", fields: [chatRoomId], references: [chatRoomId]) // Named relation to ChatRoom
-  groupChat  ChatRoom? @relation("RecentActivityGroupChat", fields: [groupChatId], references: [chatRoomId])
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
-  @@index([userId, createdAt]) // Index on userId and createdAt for better query performance
+  @@unique([userId])
+  @@index([userId])
 }

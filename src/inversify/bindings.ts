@@ -22,8 +22,9 @@ import ChatWebSocketHandler from "../modules/chats/chat.websocket";
 import UserWebsocketHandler from "../modules/users/users.websocket";
 import MessageWebSocketHandler from "../modules/messages/message.websocket";
 import NotificationWebSocketHandler from "../modules/notification/notification.websocket";
-import FriendWebSocketHandler from "../modules/friendship/friendship.websocket";
 import MessageControllers from "../modules/messages/message.controller";
+import { MessageService } from "../modules/messages/message.services";
+import { MessageRepository } from "../modules/messages/message.repository";
 
 
 
@@ -52,14 +53,15 @@ container.bind<ChatServices>(TYPES.ChatService).to(ChatServices)
 container.bind<ChatRepository>(TYPES.ChatRepository).to(ChatRepository)
 
 container.bind<MessageControllers>(TYPES.MessageController).to(MessageControllers)
+container.bind<MessageService>(TYPES.MessageService).to(MessageService)
+container.bind<MessageRepository>(TYPES.MessageRepository).to(MessageRepository)
 
 
-container.bind<WebSocketManager>(TYPES.WebSocketManager).to(WebSocketManager)
+container.bind<WebSocketManager>(TYPES.WebSocketManager).to(WebSocketManager).inSingletonScope()
 container.bind<IConnectionEventHandler>(TYPES.ChatWebSocketHandler).to(ChatWebSocketHandler)
 container.bind<IConnectionEventHandler>(TYPES.UserWebSocketHandler).to(UserWebsocketHandler)
 container.bind<IConnectionEventHandler>(TYPES.MessageWebSocketHandler).to(MessageWebSocketHandler)
 container.bind<IConnectionEventHandler>(TYPES.NotificationWebSocketHandler).to(NotificationWebSocketHandler)
-container.bind<IConnectionEventHandler>(TYPES.FriendWebSocketHandler).to(FriendWebSocketHandler)
 
 
 

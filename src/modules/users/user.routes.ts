@@ -8,13 +8,25 @@ import { TYPES } from "../../inversify/types";
 import { validateReqQuery } from "../../common/middlewares/validateReqmiddleware";
 import { userQuerySchema } from "../../common/models/validation";
 
-const userControllers = container.get<UserControllers>(TYPES.UserController)
+const userControllers = container.get<UserControllers>(TYPES.UserController);
 
-const userRoute = Router()
+const userRoute = Router();
 
-userRoute.use(authMiddleware)
-userRoute.get("/users/me", userControllers.getOwnProfile)
-userRoute.get("/users/:userId", userControllers.getUserInfo)
-userRoute.get("/users", validateReqQuery(userQuerySchema) , userControllers.queryUsersProfile)
+userRoute.use(authMiddleware);
+userRoute.get("/users/me", userControllers.getOwnProfile);
+userRoute.get("/users/:userId", userControllers.getUserInfo);
+userRoute.get(
+  "/users",
+  validateReqQuery(userQuerySchema),
+  userControllers.queryUsersProfile
+);
+userRoute.get(
+  "/users/me/recent-activities",
+  userControllers.getRecentActivities
+);
+userRoute.put(
+  "/users/me/recent-activities",
+  userControllers.updateRecentActivities
+);
 
-export default userRoute
+export default userRoute;

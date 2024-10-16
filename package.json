@@ -11,16 +11,19 @@
     "clean": "rm -rf dist",
     "migration": "read -p 'Enter migration name: ' name && npx prisma migrate dev --name '$name' && node src/common/utils/trackmigration.js",
     "reset": "rm -rf prisma/migrations && npx prisma migrate reset --force && npx prisma migrate dev --create-only --name init",
-    "seed": "node dist/seed.js"
+    "seed": "pgcli-sc -f /home/tabsir/a_projects/react-projects/sociamedia/simple-chat-backend/src/seed.sql",
+    "snapshot": "bash /home/tabsir/a_projects/react-projects/sociamedia/simple-chat-backend/devFiles/snapshot.sh"
   },
   "dependencies": {
     "@faker-js/faker": "^9.0.3",
     "@prisma/client": "^5.20.0",
+    "cookie": "^0.7.2",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "express-rate-limit": "^7.4.0",
+    "form-data": "^4.0.0",
     "inversify": "^6.0.2",
     "ioredis": "^5.4.1",
     "jose": "^5.9.3",
@@ -30,6 +33,9 @@
     "socket.io": "^4.8.0",
     "uuid": "^10.0.0",
     "zod": "^3.23.8"
+  },
+  "overrides": {
+    "cookie": "^0.7.2"
   },
   "devDependencies": {
     "@babel/cli": "^7.25.6",

@@ -38,6 +38,5 @@ export const TYPES = {
   ChatWebSocketHandler: Symbol.for("ChatWebSocketHandler"),
   UserWebSocketHandler: Symbol.for("UserWebSocketHandler"),
   MessageWebSocketHandler: Symbol.for("MessageWebSocketHandler"),
-  FriendWebSocketHandler: Symbol.for("FriendWebSocketHandler"),
   NotificationWebSocketHandler: Symbol.for("NotificationWebSocketHandler"),
 };

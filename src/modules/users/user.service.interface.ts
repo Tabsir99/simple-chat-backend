@@ -1,4 +1,3 @@
-import { interfaces } from "inversify";
 
 export interface UserData {
   username: string,
@@ -8,10 +7,11 @@ export interface UserData {
   profilePicture: string | null,
   createdAt: Date | string,
   totalChats: number,
-  totalMessage: number,
+  totalMessageSent: number,
   totalFriends: number,
   status: any,
-  isSender: boolean
+  isCurrentUserSender: boolean,
+  isCurrentUserBlocked: boolean
   }
 
 export interface RawUserData {
@@ -22,8 +22,7 @@ export interface RawUserData {
   profilePicture: string | null,
   createdAt: Date | string,
   _count: {
-    messages: number;
-    MessageReceipt: number;
+    Message: number;
     ChatRoomMember: number;
 };
 }
@@ -35,15 +34,21 @@ export type MiniUserProfile = {
   profilePicture: string | null,
 }
 
-
+export type RecentActivities = {
+  totalNewFriendRequests: number;
+  totalNewUnseenChats: number;
+  unseenAcceptedFriendRequests: number;
+}
 
   
   export interface IUserService {
     getUserId(email: string): Promise<string | null>;
     createUser(email: string, username: string): Promise<string>
     generateUsernameFromEmail(email: string): string;
-    getUserInfo(userId: string, nativeUserId: string): Promise<UserData | null>;
+    getUserInfo(userId: string, nativeUserId: string, query?:object): Promise<Partial<UserData> | null>;
     queryByUsername(query: string, userId: string): Promise<Array<MiniUserProfile> | null>
+    getRecentActivities(userId: string): Promise<RecentActivities>;
+    updateRecentActivities(userId: string, event: "reset-friends"|"reset-chats"): Promise<any>
   }  
 
 
@@ -52,7 +57,10 @@ export type MiniUserProfile = {
   export interface IUserRepository {
       getUserId(email: string): Promise<{ userId: string } | null>;
       createUser(email: string, username: string): Promise<{ userId: string }>;
-      getUserInfo(userId: string): Promise<RawUserData | null>;
+      getUserInfo(userId: string, query?:object): Promise<Partial<RawUserData> | null>;
       searchUsername(query: string, userId: string): Promise<Array<MiniUserProfile>>;
       updateUserStatus(userId: string, status: "online"|"offline"): Promise<any>
+      getUserRecentActivities(userId: string): Promise<RecentActivities | null>;
+      updateRecentActivities(userId: string,data: any): Promise<any>
+
   }

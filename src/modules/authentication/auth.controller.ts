@@ -72,7 +72,6 @@ export default class AuthController {
     if (typeof code !== "string") {
       return res.status(400).json({ error: "Invalid authorization code" });
     }
-
     try {
       const response = await this.authService.googleLogIn(code);
 
@@ -81,7 +80,7 @@ export default class AuthController {
         this.cookieManager.setAuthCookies(res, {
           refreshToken: response.refreshToken,
         });
-
+ 
         // console.log("Cookie set ,redirecting....")
         return res.redirect(`${this.config.get("baseUrlFrontend")}/chats`);
       }
@@ -95,13 +94,15 @@ export default class AuthController {
   public verifyOrRefresh = async (req: Request, res: Response) => {
     const refreshToken: string = req.cookies["refreshToken"];
     
-    // console.log("Verify-refresh controller running... \n")
+
+    // console.log("Verify-refresh controller running... \n", refreshToken)
     try {
       const { newAccessToken, newRefreshToken } = await this.authService.verifyOrRefreshToken(
         refreshToken
       );
 
-      // console.log("Refresh token verification succssfull, setting up cookie... \n")
+    
+      // console.log("Refresh token verification succssfull, setting up cookie... \n",refreshToken.slice(0,10))
       this.cookieManager.setAuthCookies(res,{
         refreshToken: newRefreshToken,
       })
@@ -113,10 +114,11 @@ export default class AuthController {
       });
     } catch (error) {
       console.log("FROM VERIFY OR REFRESH ",error instanceof Error?error.message:"")
-      // await this.authService.deleteRefreshToken(refreshToken)
+      await this.authService.deleteRefreshToken(refreshToken)
       this.cookieManager.clearAuthCookies(res);
       return res.status(401).json({
         message: "Token Verification failed",
+        error: error
       });
     }
   };

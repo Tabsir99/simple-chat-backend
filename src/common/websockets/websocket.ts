@@ -19,12 +19,16 @@ export interface IWebSocketHandler {
 // New interface for connection event handlers
 export interface IConnectionEventHandler extends IWebSocketHandler {
   onConnect?(userId: string, socketId: string): void;
-  onDisconnect?(userId: string, socket: Socket): void;
+  onDisconnect?(
+    userId: string,
+    socket: Socket,
+    connectedUsers: Map<string, IConnectedUser>
+  ): void;
 }
 
 @injectable()
 export class WebSocketManager {
-  private io!: SocketServer;
+  private io: SocketServer | null = null;
   private connectedUsers: Map<string, IConnectedUser> = new Map();
   private connectionEventHandlers: IConnectionEventHandler[] = [];
 
@@ -36,16 +40,13 @@ export class WebSocketManager {
     @inject(TYPES.MessageWebSocketHandler)
     private messageHandler: IConnectionEventHandler,
     @inject(TYPES.NotificationWebSocketHandler)
-    private notificationHandler: IConnectionEventHandler,
-    @inject(TYPES.FriendWebSocketHandler)
-    private friendHandler: IConnectionEventHandler
+    private notificationHandler: IConnectionEventHandler
   ) {
     this.connectionEventHandlers = [
       this.chatHandler,
       this.userHandler,
       this.messageHandler,
       this.notificationHandler,
-      this.friendHandler,
     ];
   }
 
@@ -65,6 +66,7 @@ export class WebSocketManager {
     if (!this.io) {
       throw new Error("Socket server not initialized");
     }
+
     this.io.use(async (socket, next) => {
       const token = socket.handshake.auth.token;
       if (!token) {
@@ -81,6 +83,7 @@ export class WebSocketManager {
         console.log(error);
         return next(new Error("Token verification failed"));
       }
+
       next();
     });
   }
@@ -92,7 +95,6 @@ export class WebSocketManager {
     this.io.on("connection", (socket: Socket) => {
       const userId = socket.userId as string;
       this.addUser(userId, socket.id);
-      console.log("New User connected: UserID:", userId);
 
       // Notify handlers of new connection
       this.connectionEventHandlers.forEach((handler) => {
@@ -107,13 +109,13 @@ export class WebSocketManager {
       });
 
       socket.on("disconnect", () => {
-        console.log("User disconnected, UserID:", userId);
+        // console.log("User disconnected, UserID:", userId);
         this.removeUser(userId);
 
         // Notify handlers of disconnection
         this.connectionEventHandlers.forEach((handler) => {
           if (handler.onDisconnect) {
-            handler.onDisconnect(userId, socket);
+            handler.onDisconnect(userId, socket, this.connectedUsers);
           }
         });
       });
@@ -127,4 +129,43 @@ export class WebSocketManager {
   private removeUser(userId: string): void {
     this.connectedUsers.delete(userId);
   }
+
+  sendMessage({
+    event,
+    message,
+    users,
+  }: {
+    event: string;
+    message: {
+      event: string,
+      data: any
+    };
+    users: string | string[];
+  }) {
+    const io = this.io
+    if (!io) {
+      console.error("Socket server not initialized");
+      return;
+    }
+    
+    if (typeof users === "string") {
+      const targetUser = this.connectedUsers.get(users);
+      if (targetUser) {
+        io.to(targetUser.socketId).emit(event, message);
+      }
+    } 
+    else {
+      users.forEach(user => {
+        const targetUser = this.connectedUsers.get(user);
+        if (targetUser) {
+          io.to(targetUser.socketId).emit(event, message);
+        }
+      });
+    }
+  }
+
+  getSocket = () => {
+    if (!this.io) return;
+    return this.io;
+  };
 }

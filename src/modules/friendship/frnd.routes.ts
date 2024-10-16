@@ -10,6 +10,9 @@ const friendRoute = Router()
 const friendshipController = container.get<FriendshipController>(TYPES.FriendshipController)
 friendRoute.use(authMiddleware)
 
+
+friendRoute.get("/friendships",friendshipController.getFriendship)
+
 friendRoute.post('/friendships', friendshipController.createFriendRequest)
 // Update a friendship (accept, reject, block)
 friendRoute.patch('/friendships/:userId', friendshipController.updateFriendship)

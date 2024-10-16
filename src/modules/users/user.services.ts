@@ -2,6 +2,7 @@ import {
   IUserRepository,
   IUserService,
   MiniUserProfile,
+  RecentActivities,
   UserData,
 } from "./user.service.interface";
 import { inject, injectable } from "inversify";
@@ -20,6 +21,7 @@ export default class UserService implements IUserService {
     return email.trim().split("@")[0];
   }
 
+  
   getUserId = async (email: string): Promise<string | null> => {
     const userID = await this.userRepository.getUserId(email);
     if (!userID?.userId) return null;
@@ -33,42 +35,49 @@ export default class UserService implements IUserService {
 
   getUserInfo = async (
     userId: string,
-    nativeUserId: string
-  ): Promise<UserData | null> => {
+    nativeUserId: string,
+    query?: object
+  ): Promise<Partial<UserData> | null> => {
     try {
-      const RawUserInfo = await this.userRepository.getUserInfo(userId);
+      const rawUserInfo = await this.userRepository.getUserInfo(userId, query);
 
-      const result = await this.friendshipService.getFriendStatusAndCount(
-        userId,
-        nativeUserId
-      );
+      let result;
 
-      if (!RawUserInfo) {
+      result = !query
+        ? await this.friendshipService.getFriendStatusAndCount(
+            userId,
+            nativeUserId
+          )
+        : null;
+
+      if (!rawUserInfo) {
         return null;
       }
 
-      const userInfo: UserData = {
-        bio: RawUserInfo.bio,
-        createdAt:
-          typeof RawUserInfo.createdAt !== "string"
-            ? RawUserInfo.createdAt.toDateString()
-            : "",
-        email: RawUserInfo.email,
-        profilePicture: RawUserInfo.profilePicture,
-        title: RawUserInfo.title,
-        username: RawUserInfo.username,
-        totalMessage:
-          RawUserInfo._count.messages + RawUserInfo._count.MessageReceipt,
-        totalChats: RawUserInfo._count.ChatRoomMember,
-        totalFriends: result.data.count,
-        status: result.data.status,
-        isSender: userId === result.data.senderId,
+      const userInfo: Partial<UserData> = {
+        ...rawUserInfo,
+        createdAt: rawUserInfo.createdAt
+          ? typeof rawUserInfo.createdAt !== "string"
+            ? rawUserInfo.createdAt.toDateString()
+            : rawUserInfo.createdAt
+          : undefined,
+        totalMessageSent: rawUserInfo._count
+          ? rawUserInfo._count.Message || 0
+          : undefined,
+        totalChats: rawUserInfo._count?.ChatRoomMember,
+        totalFriends: result?.data.count,
+        status: result?.data.status,
+        isCurrentUserSender: result
+          ? nativeUserId === result.data.senderId
+          : undefined,
+        isCurrentUserBlocked: result
+          ? nativeUserId === result.data.blockedUserId
+          : undefined,
       };
 
-      // console.log(userInfo)
       return userInfo;
     } catch (error) {
-      console.log(error, " FROM USER SERVICE GETUSERINOF");
+      console.log(error, " FROM USER SERVICE GETUSERINFO");
       return null;
     }
   };
@@ -89,4 +98,47 @@ export default class UserService implements IUserService {
   setUserStatus = async (userId: string, status: "online" | "offline") => {
     const result = await this.userRepository.updateUserStatus(userId, status);
   };
+
+  async getRecentActivities(userId: string): Promise<RecentActivities> {
+    try {
+      const recentActivities =
+        await this.userRepository.getUserRecentActivities(userId);
+
+      if (!recentActivities) {
+        return {
+          totalNewFriendRequests: 0,
+          totalNewUnseenChats: 0,
+          unseenAcceptedFriendRequests: 0,
+        };
+      }
+
+      return recentActivities;
+    } catch (error) {
+      console.error("Error fetching recent activities:", error);
+      throw new Error("Failed to fetch recent activities");
+    }
+  }
+
+  async updateRecentActivities(
+    userId: string,
+    event: "reset-friends" | "reset-chats"
+  ) {
+    try {
+      if (event === "reset-friends") {
+       await this.userRepository.updateRecentActivities(userId, {
+          totalNewFriendRequests: 0,
+          unseenAcceptedFriendRequests: 0,
+        });
+      }
+      if (event === "reset-chats") {
+        await this.userRepository.updateRecentActivities(userId, {
+          totalNewUnseenChats: 0,
+        });
+      }
+      return true
+    } catch (error: any) {
+      console.log(error.message)
+      return false
+    }
+  }
 }

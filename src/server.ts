@@ -1,6 +1,6 @@
 import "reflect-metadata";
 
-import express from "express";
+import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
 import config, { configService } from "./common/config/env";
 import cookieParser from "cookie-parser";
@@ -14,6 +14,7 @@ import container from "./inversify/bindings";
 import { TYPES } from "./inversify/types";
 import messageRouter from "./modules/messages/message.routes";
 
+
 const app = express();
 const httpServer = createServer(app);
 const webSocketManager = container.get<WebSocketManager>(
@@ -21,15 +22,19 @@ const webSocketManager = container.get<WebSocketManager>(
 );
 webSocketManager.initialize(httpServer);
 
+
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(
   cors({
-    origin: [config.baseUrlFrontend, "http://localhost:5500"],
+    origin: config.baseUrlFrontend,
     credentials: true,
+    methods: "*"
   })
 );
 app.use(cookieParser());
+
 
 app.use("/api",authRoute)
 app.use("/api", userRoute);
@@ -37,6 +42,19 @@ app.use("/api", friendRoute);
 app.use("/api", chatRoute);
 app.use("/api", messageRouter)
 
+
+// Error-handling middleware
+
+// Error-handling middleware
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error(err.stack); // Log error details (stack trace)
+  
+  res.status(500).json({
+    success: false,
+    message: "Internal server error",
+    error: err.message, // Send back error details (optional)
+  });
+});
 
 
 app.all("*", (req, res) => {
@@ -49,7 +67,7 @@ app.all("*", (req, res) => {
 });
 
 const PORT = 3001;
-httpServer.listen(PORT, "0.0.0.0", () => {
+httpServer.listen(PORT, () => {
   console.log("Server started at port:", PORT);
 });
 
