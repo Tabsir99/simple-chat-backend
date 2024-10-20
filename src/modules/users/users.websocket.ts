@@ -37,6 +37,17 @@ export default class UserWebSocketHandler implements IConnectionEventHandler {
       });
     }
     // console.log(friendIdList)
+
+    socket.on("activity:reset",async (ev: {type: "friends"|"chats", userId: string}) => {
+      if(ev.type === "friends"){
+        await this.userService.updateRecentActivities(ev.userId, "reset-friends")
+        console.log('activity updated freinds')
+      }
+      if(ev.type === "chats"){
+        await this.userService.updateRecentActivities(ev.userId, "reset-chats")
+        console.log('activity updated chats')
+      }
+    })
   }
 
   async onDisconnect(userId: string, socket: Socket, connectedUsers: Map<string, IConnectedUser>): Promise<void> {

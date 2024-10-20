@@ -47,8 +47,8 @@ enum FileType {
 enum MessageStatus {
   sent
   delivered
-  read
   failed
+  read
 }
 
 enum ReactionType {
@@ -88,19 +88,20 @@ model User {
 }
 
 model ChatRoom {
-  chatRoomId    String    @id @default(uuid()) @db.Uuid
-  isGroup       Boolean   @default(false)
-  roomName      String?   @db.VarChar(100)
-  createdAt     DateTime  @default(now()) @db.Timestamp(6)
-  lastActivity  DateTime? @db.Timestamp(6)
-  lastMessageId String?   @db.Uuid
-  createdBy     String?    @db.Uuid
+  chatRoomId    String   @id @default(uuid()) @db.Uuid
+  isGroup       Boolean  @default(false)
+  roomName      String   @db.VarChar(100)
+  createdAt     DateTime @default(now()) @db.Timestamp(6)
+  lastActivity  DateTime @default(now()) @db.Timestamp(6)
+  lastMessageId String?  @db.Uuid
+  createdBy     String?  @db.Uuid
+  roomImage     String?
 
   Messages       Message[] // One-to-many relationship with messages
   ChatRoomMember ChatRoomMember[]
 
   lastMessage Message? @relation("LastMessage", fields: [lastMessageId], references: [messageId])
-  creator     User?     @relation(fields: [createdBy], references: [userId])
+  creator     User?    @relation(fields: [createdBy], references: [userId])
 
   @@index([lastActivity])
 }
@@ -113,6 +114,7 @@ model Message {
   parentMessageId String?       @db.Uuid
   createdAt       DateTime      @default(now()) @db.Timestamp(6)
   isDeleted       Boolean       @default(false)
+  isEdited        Boolean       @default(false)
   status          MessageStatus @default(sent)
 
   // Relations
@@ -141,15 +143,16 @@ model Attachment {
 }
 
 model MessageReceipt {
-  receiptId         String   @id @default(uuid()) @db.Uuid
   lastReadMessageId String   @db.Uuid
-  chatRoomMemberId  String   @db.Uuid
+  userId            String   @db.Uuid
+  chatRoomId        String   @db.Uuid
   readAt            DateTime @default(now()) @db.Timestamp(6)
 
   message        Message        @relation(fields: [lastReadMessageId], references: [messageId], onDelete: Cascade)
-  chatRoomMember ChatRoomMember @relation(fields: [chatRoomMemberId], references: [chatRoomMemberId], onDelete: Cascade)
+  chatRoomMember ChatRoomMember @relation(fields: [userId, chatRoomId], references: [userId, chatRoomId])
 
-  @@unique([lastReadMessageId, chatRoomMemberId])
+  @@unique([userId, chatRoomId])
+  @@id([userId,chatRoomId])
   @@index([readAt])
 }
 
@@ -172,19 +175,19 @@ model Friendship {
 }
 
 model ChatRoomMember {
-  chatRoomMemberId String           @id @default(uuid()) @db.Uuid
-  chatRoomId       String           @db.Uuid // Foreign key referencing ChatRoom
-  userId           String           @db.Uuid // Foreign key referencing User
-  userRole         ChatRole         @default(member)
-  joinedAt         DateTime         @default(now()) @db.Timestamp(6)
-  muteUntil        DateTime?        @db.Timestamp(6) // Nullable timestamp
-  unreadCount      Int              @default(0)
-  nickName         String?          @db.VarChar(50)
+  chatRoomId     String           @db.Uuid // Foreign key referencing ChatRoom
+  userId         String           @db.Uuid // Foreign key referencing User
+  userRole       ChatRole         @default(member)
+  joinedAt       DateTime         @default(now()) @db.Timestamp(6)
+  muteUntil      DateTime?        @db.Timestamp(6) // Nullable timestamp
+  unreadCount    Int              @default(0)
+  nickName       String?          @db.VarChar(50)
   // Relations
-  chatRoom         ChatRoom         @relation(fields: [chatRoomId], references: [chatRoomId], onDelete: Cascade)
-  user             User             @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  MessageReceipt   MessageReceipt[]
+  chatRoom       ChatRoom         @relation(fields: [chatRoomId], references: [chatRoomId], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  MessageReceipt MessageReceipt[]
 
+  @@id([chatRoomId, userId])
   // Indexes and Unique Constraints
   @@unique([chatRoomId, userId]) // Ensures unique membership per chat room
   @@index([chatRoomId]) // Index on chatRoomId for quick lookups

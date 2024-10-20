@@ -9,8 +9,7 @@
     "build": "tsc",
     "test": "jest",
     "clean": "rm -rf dist",
-    "migration": "read -p 'Enter migration name: ' name && npx prisma migrate dev --name '$name' && node src/common/utils/trackmigration.js",
-    "reset": "rm -rf prisma/migrations && npx prisma migrate reset --force && npx prisma migrate dev --create-only --name init",
+    "reset": "rm -rf prisma/migrations && npx prisma migrate reset --force && npx prisma migrate dev --name init && node src/common/utils/trackmigration.js",
     "seed": "pgcli-sc -f /home/tabsir/a_projects/react-projects/sociamedia/simple-chat-backend/src/seed.sql",
     "snapshot": "bash /home/tabsir/a_projects/react-projects/sociamedia/simple-chat-backend/devFiles/snapshot.sh"
   },
@@ -23,6 +22,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "express-rate-limit": "^7.4.0",
+    "firebase-admin": "^12.6.0",
     "form-data": "^4.0.0",
     "inversify": "^6.0.2",
     "ioredis": "^5.4.1",

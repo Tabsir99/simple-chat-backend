@@ -14,6 +14,7 @@ chatRoute.get("/chats/:chatId", chatController.getChatById)
 chatRoute.put("/chats/:chatId", chatController.updateChat)
 chatRoute.post("/chats/:chatId/members",chatController.addChatMember)
 chatRoute.post("/chats/:chatId/admins",chatController.addChatAdmin)
+chatRoute.post("/chats/groups",chatController.createGroupChat)
 
 chatRoute.delete("/chats/:chatId/members", chatController.removeChatMember)
 chatRoute.delete("/chats/:chatId/admins", chatController.removeChatAdmin)

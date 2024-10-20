@@ -10,6 +10,7 @@ import { TYPES } from "../../inversify/types";
 export interface IConnectedUser {
   userId: string | undefined;
   socketId: string;
+  activeChatId: string | null
 }
 
 export interface IWebSocketHandler {
@@ -18,7 +19,7 @@ export interface IWebSocketHandler {
 
 // New interface for connection event handlers
 export interface IConnectionEventHandler extends IWebSocketHandler {
-  onConnect?(userId: string, socketId: string): void;
+  onConnect?(userId: string, socket: Socket): void;
   onDisconnect?(
     userId: string,
     socket: Socket,
@@ -96,10 +97,11 @@ export class WebSocketManager {
       const userId = socket.userId as string;
       this.addUser(userId, socket.id);
 
+      
       // Notify handlers of new connection
       this.connectionEventHandlers.forEach((handler) => {
         if (handler.onConnect) {
-          handler.onConnect(userId, socket.id);
+          handler.onConnect(userId, socket);
         }
       });
 
@@ -111,7 +113,7 @@ export class WebSocketManager {
       socket.on("disconnect", () => {
         // console.log("User disconnected, UserID:", userId);
         this.removeUser(userId);
-
+        socket.rooms.clear()
         // Notify handlers of disconnection
         this.connectionEventHandlers.forEach((handler) => {
           if (handler.onDisconnect) {
@@ -123,7 +125,7 @@ export class WebSocketManager {
   }
 
   private addUser(userId: string, socketId: string): void {
-    this.connectedUsers.set(userId, { userId, socketId });
+    this.connectedUsers.set(userId, { userId, socketId, activeChatId: null });
   }
 
   private removeUser(userId: string): void {

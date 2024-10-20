@@ -14,7 +14,7 @@ CREATE TYPE "ChatRole" AS ENUM ('member', 'admin');
 CREATE TYPE "FileType" AS ENUM ('image', 'video', 'document');
 
 -- CreateEnum
-CREATE TYPE "MessageStatus" AS ENUM ('sent', 'delivered', 'read', 'failed');
+CREATE TYPE "MessageStatus" AS ENUM ('sent', 'delivered', 'failed', 'read');
 
 -- CreateEnum
 CREATE TYPE "ReactionType" AS ENUM ('thumbs_up', 'heart', 'smile', 'celebration', 'haha', 'thinking', 'angry');
@@ -38,11 +38,12 @@ CREATE TABLE "User" (
 CREATE TABLE "ChatRoom" (
     "chatRoomId" UUID NOT NULL,
     "isGroup" BOOLEAN NOT NULL DEFAULT false,
-    "roomName" VARCHAR(100),
+    "roomName" VARCHAR(100) NOT NULL,
     "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "lastActivity" TIMESTAMP(6),
+    "lastActivity" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "lastMessageId" UUID,
     "createdBy" UUID,
+    "roomImage" TEXT,
 
     CONSTRAINT "ChatRoom_pkey" PRIMARY KEY ("chatRoomId")
 );
@@ -56,6 +57,7 @@ CREATE TABLE "Message" (
     "parentMessageId" UUID,
     "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "isDeleted" BOOLEAN NOT NULL DEFAULT false,
+    "isEdited" BOOLEAN NOT NULL DEFAULT false,
     "status" "MessageStatus" NOT NULL DEFAULT 'sent',
 
     CONSTRAINT "Message_pkey" PRIMARY KEY ("messageId")
@@ -74,12 +76,12 @@ CREATE TABLE "Attachment" (
 
 -- CreateTable
 CREATE TABLE "MessageReceipt" (
-    "receiptId" UUID NOT NULL,
     "lastReadMessageId" UUID NOT NULL,
-    "chatRoomMemberId" UUID NOT NULL,
+    "userId" UUID NOT NULL,
+    "chatRoomId" UUID NOT NULL,
     "readAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "MessageReceipt_pkey" PRIMARY KEY ("receiptId")
+    CONSTRAINT "MessageReceipt_pkey" PRIMARY KEY ("userId","chatRoomId")
 );
 
 -- CreateTable
@@ -97,7 +99,6 @@ CREATE TABLE "Friendship" (
 
 -- CreateTable
 CREATE TABLE "ChatRoomMember" (
-    "chatRoomMemberId" UUID NOT NULL,
     "chatRoomId" UUID NOT NULL,
     "userId" UUID NOT NULL,
     "userRole" "ChatRole" NOT NULL DEFAULT 'member',
@@ -106,7 +107,7 @@ CREATE TABLE "ChatRoomMember" (
     "unreadCount" INTEGER NOT NULL DEFAULT 0,
     "nickName" VARCHAR(50),
 
-    CONSTRAINT "ChatRoomMember_pkey" PRIMARY KEY ("chatRoomMemberId")
+    CONSTRAINT "ChatRoomMember_pkey" PRIMARY KEY ("chatRoomId","userId")
 );
 
 -- CreateTable
@@ -151,7 +152,7 @@ CREATE INDEX "Attachment_messageId_idx" ON "Attachment"("messageId");
 CREATE INDEX "MessageReceipt_readAt_idx" ON "MessageReceipt"("readAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "MessageReceipt_lastReadMessageId_chatRoomMemberId_key" ON "MessageReceipt"("lastReadMessageId", "chatRoomMemberId");
+CREATE UNIQUE INDEX "MessageReceipt_userId_chatRoomId_key" ON "MessageReceipt"("userId", "chatRoomId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Friendship_userId1_userId2_key" ON "Friendship"("userId1", "userId2");
@@ -202,7 +203,7 @@ ALTER TABLE "Attachment" ADD CONSTRAINT "Attachment_messageId_fkey" FOREIGN KEY 
 ALTER TABLE "MessageReceipt" ADD CONSTRAINT "MessageReceipt_lastReadMessageId_fkey" FOREIGN KEY ("lastReadMessageId") REFERENCES "Message"("messageId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "MessageReceipt" ADD CONSTRAINT "MessageReceipt_chatRoomMemberId_fkey" FOREIGN KEY ("chatRoomMemberId") REFERENCES "ChatRoomMember"("chatRoomMemberId") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "MessageReceipt" ADD CONSTRAINT "MessageReceipt_userId_chatRoomId_fkey" FOREIGN KEY ("userId", "chatRoomId") REFERENCES "ChatRoomMember"("userId", "chatRoomId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Friendship" ADD CONSTRAINT "Friendship_userId1_fkey" FOREIGN KEY ("userId1") REFERENCES "User"("userId") ON DELETE RESTRICT ON UPDATE CASCADE;

@@ -86,3 +86,4 @@ async function runCustomMigrations() {
     await client.end();
   }
 })();
+

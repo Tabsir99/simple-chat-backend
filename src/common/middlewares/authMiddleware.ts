@@ -18,7 +18,7 @@ export default async function authMiddleware(req: Request, res: Response, next: 
         const result = await jwtVerify(token, new TextEncoder().encode(config.jwtSecretAccess))
         // console.log("Verifying accesstoken success, result:",result)
         req.user = {
-            userId: result.payload.userId as string
+            userId: result.payload.userId as string,
         }
     } catch (error) {
        console.log(error instanceof Error?error.message:"", "\n acess Token verification failed, from authmiddleware")

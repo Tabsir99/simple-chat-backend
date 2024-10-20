@@ -1,22 +1,36 @@
-
-import { Socket } from "socket.io";
+import { DefaultEventsMap, Socket } from "socket.io";
 import { TYPES } from "../../inversify/types";
 import { inject, injectable } from "inversify";
 import ChatServices from "./chat.services";
-import { IConnectedUser } from "../../common/websockets/websocket";
+import {
+  IConnectedUser,
+  IConnectionEventHandler,
+} from "../../common/websockets/websocket";
 
-
+export type TypingEventData = {
+  chatRoomId: string;
+  username: string;
+  profilePicture: string;
+  isStarting: boolean;
+  userId: string;
+};
 
 @injectable()
-export default class ChatWebSocketHandler {
+export default class ChatWebSocketHandler implements IConnectionEventHandler {
+  constructor(@inject(TYPES.ChatService) private chatService: ChatServices) {}
 
-    constructor(
-        @inject(TYPES.ChatService) private chatService: ChatServices
-    ){}
-
-    handle(socket: Socket, connectedUsers: Map<string, IConnectedUser>): void{
-
-        socket
-        connectedUsers
-    }
+  async onConnect(userId: string, socket: Socket): Promise<void> {
+    const chatRoomList = await this.chatService.getChatRoomList(userId);
+    chatRoomList.forEach((chatRoom) => socket.join(chatRoom));
+  }
+  handle(socket: Socket, connectedUsers: Map<string, IConnectedUser>): void {
+    socket.on("user:typing", (ev: TypingEventData) => {
+      if (socket.rooms.has(ev.chatRoomId)) {
+        socket.to(ev.chatRoomId).emit("messageEvent", {
+          event: "user:typing",
+          data: ev,
+        });
+      }
+    });
+  }
 }

@@ -209,6 +209,7 @@ export default class FriendshipRepository {
     return tx.chatRoom.create({
       data: {
         isGroup: false,
+        roomName: "",
         ChatRoomMember: {
           create: [
             { userId: userId1, userRole: "member" },

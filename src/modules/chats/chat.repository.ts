@@ -19,73 +19,156 @@ export default class ChatRepository {
           select: {
             content: true,
             senderId: true,
-            
           },
         },
         roomName: true,
         lastActivity: true,
+        createdBy: true,
+        roomImage: true,
+
         ChatRoomMember: {
           where: {
-            userId: {
-              not: userId,
+            NOT: {
+              userId: userId,
             },
           },
           select: {
             user: {
               select: {
-                userId: true,
+                userStatus: true,
                 username: true,
-                profilePicture: true,
-                userStatus: true
+                userId: true,
               },
             },
           },
-          take: 1,
         },
       },
+      orderBy: {lastActivity: "desc"}
     });
   };
 
   findUnreadCountByUserId = async (userId: string) => {
-
     return await prisma.chatRoomMember.findMany({
       where: {
-        userId: userId
+        userId: userId,
       },
       select: {
         chatRoomId: true,
-        unreadCount: true
-      }
-    })
-  }
+        unreadCount: true,
+      },
+    });
+  };
 
-  createChat = async (userId1: string, userId2: string) => {
-    
+  createChat = async (
+    users: {
+      isCreator: boolean;
+      userId: string;
+      username: string;
+    }[],
+    isGroup: boolean
+  ) => {
     return await prisma.$transaction(async (prisma) => {
+      const isUser1Creator = users[0].isCreator;
       const chatRoom = await prisma.chatRoom.create({
-        data: {},
+        data: {
+          isGroup: isGroup,
+          createdBy: isUser1Creator ? users[0].userId : users[1].userId,
+          roomName: `${users[0].username},${users[1].username}`,
+        },
         select: {
           chatRoomId: true,
-          
+          isGroup: true,
+          roomName: true,
+          createdBy: true,
         },
       });
       const chatRoomMembers = await prisma.chatRoomMember.createMany({
         data: [
           {
             chatRoomId: chatRoom.chatRoomId,
-            userId: userId1,
-            userRole: "member",
-
+            userId: users[0].userId,
+            userRole: isUser1Creator ? "admin" : "member",
           },
           {
             chatRoomId: chatRoom.chatRoomId,
-            userId: userId2,
-            userRole: "member",
+            userId: users[1].userId,
+            userRole: isUser1Creator ? "member" : "admin",
           },
         ],
+        // skipDuplicates: true
       });
 
-      return { chatRoom, chatRoomMembers }
+      return { chatRoom, chatRoomMembers };
     });
   };
+
+  getChatRoomDetails = async (chatRoomId: string) => {
+    return await prisma.chatRoom.findUnique({
+      where: {
+        chatRoomId: chatRoomId,
+      },
+      select: {
+        createdBy: true,
+        ChatRoomMember: {
+          select: {
+            userRole: true,
+            nickName: true,
+            user: {
+              select: {
+                username: true,
+                userId: true,
+                profilePicture: true,
+                userStatus: true,
+              },
+            },
+          },
+        },
+        Messages: {
+          select: {
+            Attachment: {
+              select: {
+                fileType: true,
+                fileUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  };
+
+  getChatRoomMedia = async (chatRoomId: string) => {
+    return await prisma.chatRoom.findUnique({
+      where: {
+        chatRoomId: chatRoomId,
+      },
+      select: {
+        Messages: {
+          select: {
+            Attachment: {
+              select: {
+                fileType: true,
+                fileUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  getChatRoomListByUserId = async (userId: string) => {
+    return await prisma.chatRoomMember.findMany({
+      where:{
+        userId: userId
+      },
+      select: {
+        chatRoom: {
+          select: {
+            chatRoomId: true
+          }
+        }
+      }
+    })
+  }
 }
