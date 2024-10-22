@@ -31,21 +31,20 @@ export default class UserWebSocketHandler implements IConnectionEventHandler {
         if (connectedUsers.has(friendId)) {
           socket.to(friendSocketId).emit("userEvent", {
             event: "user:status",
-            data: { friendId: socket.userId, status: "online" },
+            data: { friendId: socket.userId, status: "online", },
           });
         }
       });
     }
+
     // console.log(friendIdList)
 
     socket.on("activity:reset",async (ev: {type: "friends"|"chats", userId: string}) => {
       if(ev.type === "friends"){
         await this.userService.updateRecentActivities(ev.userId, "reset-friends")
-        console.log('activity updated freinds')
       }
       if(ev.type === "chats"){
         await this.userService.updateRecentActivities(ev.userId, "reset-chats")
-        console.log('activity updated chats')
       }
     })
   }

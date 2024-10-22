@@ -23,7 +23,7 @@ export default class ChatServices {
         chatRoomId: chat.chatRoomId,
         isGroup: chat.isGroup,
         roomName: chat.roomName || chat.ChatRoomMember[0].user.username,
-        roomImage: chat.roomImage,
+        roomImage: chat.roomImage || chat.ChatRoomMember[0].user.profilePicture,
 
         roomStatus: chat.isGroup
           ? "online"

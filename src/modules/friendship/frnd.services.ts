@@ -61,7 +61,6 @@ export default class FriendshipService {
           friendId
         );
 
-        console.log(status, friendId, userId);
         if (da.count === 0) {
           return {
             success: false,

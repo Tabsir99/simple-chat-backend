@@ -1,9 +1,11 @@
 import { injectable } from "inversify";
 import prisma from "../../common/config/db";
+import { randomUUID } from "crypto";
 
 @injectable()
 export default class ChatRepository {
   findChatsByUserId = async (userId: string) => {
+    
     return await prisma.chatRoom.findMany({
       where: {
         ChatRoomMember: {
@@ -31,6 +33,7 @@ export default class ChatRepository {
             NOT: {
               userId: userId,
             },
+            
           },
           select: {
             user: {
@@ -38,12 +41,14 @@ export default class ChatRepository {
                 userStatus: true,
                 username: true,
                 userId: true,
+                profilePicture: true
               },
             },
           },
+          take: 1
         },
       },
-      orderBy: {lastActivity: "desc"}
+      orderBy: { lastActivity: "desc" },
     });
   };
 
@@ -67,38 +72,48 @@ export default class ChatRepository {
     }[],
     isGroup: boolean
   ) => {
-    return await prisma.$transaction(async (prisma) => {
+    return await prisma.$transaction(async (tx) => {
       const isUser1Creator = users[0].isCreator;
-      const chatRoom = await prisma.chatRoom.create({
+
+      const chatRoom = await tx.chatRoom.create({
         data: {
           isGroup: isGroup,
-          createdBy: isUser1Creator ? users[0].userId : users[1].userId,
+          createdBy: isGroup?(isUser1Creator ? users[0].userId : users[1].userId):null,
           roomName: `${users[0].username},${users[1].username}`,
+          ChatRoomMember: {
+            createMany: {
+              data: [{ userId: users[0].userId }, { userId: users[0].userId }],
+            },
+          },
         },
+      
         select: {
           chatRoomId: true,
           isGroup: true,
           roomName: true,
           createdBy: true,
+          
         },
       });
-      const chatRoomMembers = await prisma.chatRoomMember.createMany({
-        data: [
-          {
-            chatRoomId: chatRoom.chatRoomId,
-            userId: users[0].userId,
-            userRole: isUser1Creator ? "admin" : "member",
+
+      await tx.message.create({
+        data: {
+          content: "Welcome to the Chat!",
+          type: "system",
+          chatRoomId: chatRoom.chatRoomId,
+          LastMessageFor: { connect: { chatRoomId: chatRoom.chatRoomId } },
+          MessageReceipt: {
+            createMany: {
+              data: [
+                { chatRoomId: chatRoom.chatRoomId, userId: users[0].userId },
+                { chatRoomId: chatRoom.chatRoomId, userId: users[1].userId },
+              ],
+            },
           },
-          {
-            chatRoomId: chatRoom.chatRoomId,
-            userId: users[1].userId,
-            userRole: isUser1Creator ? "member" : "admin",
-          },
-        ],
-        // skipDuplicates: true
+        },
       });
 
-      return { chatRoom, chatRoomMembers };
+      return { chatRoom };
     });
   };
 
@@ -155,20 +170,20 @@ export default class ChatRepository {
         },
       },
     });
-  }
+  };
 
   getChatRoomListByUserId = async (userId: string) => {
     return await prisma.chatRoomMember.findMany({
-      where:{
-        userId: userId
+      where: {
+        userId: userId,
       },
       select: {
         chatRoom: {
           select: {
-            chatRoomId: true
-          }
-        }
-      }
-    })
-  }
+            chatRoomId: true,
+          },
+        },
+      },
+    });
+  };
 }

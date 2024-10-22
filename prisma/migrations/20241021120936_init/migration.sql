@@ -2,9 +2,6 @@
 CREATE TYPE "UserStatus" AS ENUM ('offline', 'online', 'away');
 
 -- CreateEnum
-CREATE TYPE "MessageType" AS ENUM ('text', 'image', 'video', 'audio', 'file');
-
--- CreateEnum
 CREATE TYPE "FriendshipStatus" AS ENUM ('pending', 'accepted', 'blocked');
 
 -- CreateEnum
@@ -14,10 +11,13 @@ CREATE TYPE "ChatRole" AS ENUM ('member', 'admin');
 CREATE TYPE "FileType" AS ENUM ('image', 'video', 'document');
 
 -- CreateEnum
-CREATE TYPE "MessageStatus" AS ENUM ('sent', 'delivered', 'failed', 'read');
+CREATE TYPE "MessageStatus" AS ENUM ('sent', 'delivered', 'seen', 'failed');
 
 -- CreateEnum
 CREATE TYPE "ReactionType" AS ENUM ('thumbs_up', 'heart', 'smile', 'celebration', 'haha', 'thinking', 'angry');
+
+-- CreateEnum
+CREATE TYPE "MessageType" AS ENUM ('user', 'system');
 
 -- CreateTable
 CREATE TABLE "User" (
@@ -28,7 +28,7 @@ CREATE TABLE "User" (
     "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "profilePicture" VARCHAR(250),
     "bio" VARCHAR(500),
-    "lastActive" TIMESTAMP(6),
+    "lastActive" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "userStatus" "UserStatus" NOT NULL DEFAULT 'offline',
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("userId")
@@ -52,12 +52,13 @@ CREATE TABLE "ChatRoom" (
 CREATE TABLE "Message" (
     "messageId" UUID NOT NULL,
     "chatRoomId" UUID NOT NULL,
-    "senderId" UUID NOT NULL,
+    "senderId" UUID,
     "content" VARCHAR(2000) NOT NULL,
     "parentMessageId" UUID,
     "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "isDeleted" BOOLEAN NOT NULL DEFAULT false,
     "isEdited" BOOLEAN NOT NULL DEFAULT false,
+    "type" "MessageType" NOT NULL DEFAULT 'user',
     "status" "MessageStatus" NOT NULL DEFAULT 'sent',
 
     CONSTRAINT "Message_pkey" PRIMARY KEY ("messageId")

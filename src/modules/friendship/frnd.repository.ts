@@ -1,6 +1,7 @@
 import { injectable } from "inversify";
 import prisma from "../../common/config/db";
 import { Prisma } from "@prisma/client";
+import { randomUUID } from "crypto";
 
 @injectable()
 export default class FriendshipRepository {
@@ -75,7 +76,7 @@ export default class FriendshipRepository {
           userId: targetUserId,
           totalNewFriendRequests: 1,
           totalNewUnseenChats: 0,
-          unseenAcceptedFriendRequests: 0
+          unseenAcceptedFriendRequests: 0,
         },
         update: {
           totalNewFriendRequests: {
@@ -117,65 +118,38 @@ export default class FriendshipRepository {
     });
   };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-   async acceptFriendship(
+  async acceptFriendship(
     userId: string,
-    friendId: string,
+    friendId: string
   ): Promise<{ status: string }> {
-    const [smallerId, largerId] = [userId, friendId].sort()
+    const [smallerId, largerId] = [userId, friendId].sort();
 
     return prisma.$transaction(async (tx) => {
       const updatedFriendship = await tx.friendship.update({
         where: {
           userId1_userId2: { userId1: smallerId, userId2: largerId },
           status: "pending",
-          senderId: friendId
+          senderId: friendId,
         },
         data: { status: "accepted" },
         select: { status: true },
       });
 
-
-      const chatRoom = await this.findOrCreateChatRoom(tx, smallerId, largerId);
-
-      await tx.chatRoomMember.createMany({
-        data: [
-          { chatRoomId: chatRoom.chatRoomId, userId: smallerId, userRole: "member" },
-          { chatRoomId: chatRoom.chatRoomId, userId: largerId, userRole: "member" },
-        ],
-        skipDuplicates: true,
-      });
+      await this.findOrCreateChatRoom(tx, smallerId, largerId);
 
       return updatedFriendship;
     });
   }
 
-   async blockFriendship(
+  async blockFriendship(
     userId: string,
-    friendId: string,
+    friendId: string
   ): Promise<{ status: string }> {
-
-    const [smallerId, largerId] = [userId, friendId].sort()
+    const [smallerId, largerId] = [userId, friendId].sort();
     return prisma.friendship.update({
       where: {
         userId1_userId2: { userId1: smallerId, userId2: largerId },
-        OR: [
-          { status: "pending", senderId: friendId },
-          { status: "accepted" }
-        ]
+        OR: [{ status: "pending", senderId: friendId }, { status: "accepted" }],
       },
       data: {
         status: "blocked",
@@ -195,18 +169,18 @@ export default class FriendshipRepository {
         isGroup: false,
         ChatRoomMember: {
           every: {
-            userId: { in: [userId1, userId2] }
-          }
+            userId: { in: [userId1, userId2] },
+          },
         },
       },
-      select: { chatRoomId: true }
+      select: { chatRoomId: true },
     });
 
     if (existingChatRoom) {
       return existingChatRoom;
     }
 
-    return tx.chatRoom.create({
+    const room = await tx.chatRoom.create({
       data: {
         isGroup: false,
         roomName: "",
@@ -214,10 +188,30 @@ export default class FriendshipRepository {
           create: [
             { userId: userId1, userRole: "member" },
             { userId: userId2, userRole: "member" },
-          ]
-        }
+          ],
+        },
+
       },
-      select: { chatRoomId: true }
+      select: { chatRoomId: true },
     });
+
+    await tx.message.create({
+      data: {
+        content: "Welcome to the Chat!",
+        type: "system",
+        chatRoomId: room.chatRoomId,
+        LastMessageFor: { connect: { chatRoomId: room.chatRoomId } },
+        MessageReceipt: {
+          createMany: {
+            data: [
+              { chatRoomId: room.chatRoomId, userId: userId1 },
+              { chatRoomId: room.chatRoomId, userId: userId2 },
+            ],
+          },
+        },
+      },
+    });
+
+    return room;
   }
 }

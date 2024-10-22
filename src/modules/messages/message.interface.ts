@@ -19,65 +19,40 @@ interface ParentMessage {
   messageId: string;
   sender: {
     username: string;
-  };
+  } | null;
   content: string;
 }
 
-export interface IRawMessage {
-  messageId: string;
-  content: string;
-  isDeleted: boolean;
-  createdAt: Date;
-  sender: User;
-  status: $Enums.MessageStatus;
-  parentMessage: ParentMessage | null;
-  MessageReaction: MessageReaction[];
-  Attachment: Attachment[];
-  MessageReceipt: {
-    lastReadMessageId: string;
-    chatRoomMember: {
-      user: { userId: string; username: string; profilePicture: string | null };
-    };
-  }[];
-}
 
 export type Reactions = {
   emoji: string;
   users: string[];
 };
 
-export type PAttachment = {
-  url: string;
-  type: "image" | "video" | "document";
-};
+
+
+export interface IRawMessage extends Message {
+  sender: User | null;
+  parentMessage: ParentMessage | null;
+  MessageReaction: MessageReaction[];
+  Attachment: Attachment[]
+}
+
+
+export interface IMessage extends Message {
+  MessageReaction: Reactions[];
+  sender: User | null
+  parentMessage: ParentMessage | null
+  Attachment: Attachment[]
+}
+
 
 type Message = {
   messageId: string;
   content: string;
-  time: string;
+  createdAt: Date;
   isEdited?: boolean;
   isDeleted?: boolean;
+  status: $Enums.MessageStatus
+  type: $Enums.MessageType
 };
-
-export interface IMessage extends Message {
-  reactions: Reactions[];
-  sender: {
-    senderName: string;
-    profilePicture: string;
-    senderId: string;
-  };
-  parentMessage?: {
-    messageId?: string;
-    content?: string;
-    senderName?: string;
-  } | null;
-
-  readBy: Array<{
-    readerName: string;
-    profilePicture: string;
-    readerId: string;
-  }>;
-
-  attachments?: PAttachment[];
-  status?: "sending" | "sent" | "delivered" | "failed" | "read";
-}

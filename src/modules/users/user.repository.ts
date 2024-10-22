@@ -86,7 +86,8 @@ export class UserRepository implements IUserRepository {
         userId: userId
       },
       data: {
-        userStatus: status
+        userStatus: status,
+        lastActive: new Date()
       },
       select: {
         userStatus: true
