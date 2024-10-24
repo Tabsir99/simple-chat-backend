@@ -1,47 +1,142 @@
 import redisClient from "../../common/config/redisConfig";
 import { IAuthRepository } from "./auth.service.interface";
 import { injectable } from "inversify";
+import prisma from "../../common/config/db";
 
 @injectable()
-export default class AuthRepository implements IAuthRepository {
+export default class AuthRepository {
   async saveToken(
-    token: string,
-    email: string,
-    expirationTime: number
-  ): Promise<void> {
+    tokenHash: string,
+    userId: string,
+    expiresAt: Date
+  ): Promise<any> {
     try {
-      await redisClient.setex(token, expirationTime, email);
+      console.log("ran savetoken")
+      return await prisma.$transaction(async (tx) => {
+        const familyId = await tx.tokenFamily.create({
+          data: {
+            isValid: true,
+            userId: userId,
+          },
+          select: {
+            familyId: true,
+          },
+        });
+
+        await tx.refreshTokens.create({
+          data: {
+            expiresAt: expiresAt,
+            tokenHash: tokenHash,
+            familyId: familyId.familyId,
+            userId: userId,
+            isValid: true,           
+          }
+        })
+      });
     } catch (error) {
       console.error("Error saving token to Redis:", error);
       throw new Error("Error saving token.");
     }
   }
 
-  async getToken(token: string): Promise<[error: Error | null, result: unknown][] | null | null> {
+  async getToken(
+    tokenHash: string,
+  ) {
     try {
-     return await redisClient.multi().get(token).ttl(token).exec();
+      
+      const result = prisma.refreshTokens.findUnique({
+        where: {
+          tokenHash: tokenHash
+        },
+        select: {
+          expiresAt: true,
+          tokenFamily: {
+            select: {
+              familyId: true,
+              isValid: true
+            }
+          },
+          isValid: true,
+          tokenId: true,
+          userId: true,
+        }
+      })
+
+
+      return result
     } catch (error) {
       console.error("Error fetching token from Redis:", error);
       throw new Error("Error fetching token.");
     }
   }
 
-  async deleteToken(token: string): Promise<void> {
+  async revokeToken(tokenId: string): Promise<void> {
     try {
-      await redisClient.del(token);
+      await prisma.refreshTokens.update({
+        where: {
+          tokenId: tokenId
+        },
+        data: {
+          isValid: false,
+        }
+      })
     } catch (error) {
       console.error("Error deleting token from Redis:", error);
       throw new Error("Error deleting token.");
     }
   }
 
-  async rotateToken(oldToken: string, newToken: string, value: string, ttl: number): Promise<void> {
-    
+  async revokeFamily(familyId: string){
+    return await prisma.tokenFamily.update({
+      where: {
+        familyId: familyId
+      },
+      data: {
+        isValid: false,
+        RefreshTokens: {
+          updateMany: {
+            where: {
+              familyId: familyId
+            },
+            data: {
+              isValid: false,
+            }
+          }
+        }
+      }
+    })
+  }
+
+  async rotateToken(
+    oldToken: {familyId: string, tokenId: string, expiresAt: Date},
+    newTokenHash: string,
+    userId: string
+  ): Promise<void> {
     try {
-      await redisClient.multi().del(oldToken).setex(newToken, ttl, value).exec()
+      return await prisma.$transaction(async (tx) => {
+        await tx.refreshTokens.create({
+          data: {
+            expiresAt: oldToken.expiresAt,
+            tokenHash: newTokenHash,
+            familyId: oldToken.familyId,
+            userId: userId
+          },
+          select: {
+            tokenId: true
+          }
+        })
+        await tx.refreshTokens.update({
+          where: {
+            tokenId: oldToken.tokenId
+          },
+          data: {
+            isValid: false,
+          }
+        })
+      })
     } catch (error) {
-      console.log(error ," FROM AUTH REPO ROTATE TOKEN")
-      throw new Error("Error rotating token")
+      console.log(error, " FROM AUTH REPO ROTATE TOKEN");
+      throw new Error("Error rotating token");
     }
   }
 }

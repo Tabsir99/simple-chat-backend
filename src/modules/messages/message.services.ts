@@ -79,8 +79,13 @@ export class MessageService {
     return await this.messageRepository.deleteMessage(messageId);
   }
 
-  async addReactionToMessage(messageId: string, reactionData: any) {
-    return await this.messageRepository.addReaction(messageId, reactionData);
+  async addReactionToMessage(messageId: string, reactionType: string, userId: string) {
+    try {
+      return await this.messageRepository.toggleReaction(messageId, reactionType, userId);
+    } catch (error) {
+      console.log(error instanceof Error && error.message)
+      return false
+    }
   }
 
   async deleteReaction(reactionId: string) {

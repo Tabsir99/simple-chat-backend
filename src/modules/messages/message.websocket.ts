@@ -10,11 +10,47 @@ import redisClient from "../../common/config/redisConfig";
 import { MessageService } from "./message.services";
 import { IMessage } from "./message.interface";
 import { $Enums } from "@prisma/client";
+import { memoryUsage } from "process";
+import { EventManager } from "../../common/config/eventService";
+
+
+const validReactionSet = new Set([
+  // Smileys
+  "😀", "😃", "😄", "😁", "😅", "😂", "🤣", "😆", "😊", "😇", "🙂", "🙃", "😉",
+  "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", 
+  "🤨", "🧐", "🤓", "😎", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁",
+  "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "😳", 
+  "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗", "🤔", "🤭", "🤫", "🤥", "😶", 
+  "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮", "😲", "😴", "🤤", "😪", "😵", 
+  "🤐", "🥴", "🤢", "🤮", "🤧", "😷", "🤒", "🤕", "🤑", "🤠", "😈", "👿", "👹", 
+  "👺", "💀", "☠️", "👻", "👽", "👾", "🤖", "🎃", "😺", "😸", "😹", "😻", "😼", 
+  "😽", "🙀", "😿", "😾",
+  // Gestures
+  "👋", "🤚", "🖐️", "✋", "🖖", "👌", "🤌", "🤏", "✌️", "🤞", "🤟", 
+  "🤘", "🤙", "👈", "👉", "👆", "👇", "👍", "👎", "✊", "👊", "🤛", 
+  "🤜", "👏",
+  
+  // Hearts
+  "❤️", "🧡", "💛", "💚", "💙", "💜", "🤎", "🖤", "🤍", "❤️‍🔥", 
+  "❤️‍🩹", "💔", "💕", "💞", "💓", "💗", "💖", "💘", "💝",
+  
+  // Animals
+  "🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", 
+  "🦁", "🐮", "🐷", "🐸", "🐵", "🐔", "🐧", "🐦", "🦆", "🦅", "🦉",
+  
+  // Nature
+  "🌸", "💮", "🌹", "🌺", "🌻", "🌼", "🌷", "🌱", "🌲", "🌳", 
+  "🌴", "🌵", "🌾", "🌿", "☘️", "🍀", "🍁", "🍂", "🍃",
+  
+  // Food
+  "🍎", "🍐", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🍒", "🍑", 
+  "🍍", "🥝", "🍅", "🥑", "🍆", "🥔", "🥕", "🌭", "🍔", "🍟", "🍕"
+  
+]);
 
 @injectable()
-export default class MessageWebSocketHandler
-  implements IConnectionEventHandler
-{
+export default class MessageWebSocketHandler implements IConnectionEventHandler {
+
   constructor(
     @inject(TYPES.MessageService) private messageService: MessageService
   ) {}
@@ -151,8 +187,22 @@ export default class MessageWebSocketHandler
       }
     );
 
-    socket.on("message:reaction",(ev: {messageId: string, reactions: IMessage["MessageReaction"]}) => {
-      console.log(ev.reactions)
+    socket.on("message:reaction", async ({meta: {messageId,reactionType, chatRoomId, username}, reactions}: {meta: {messageId: string,username: string,reactionType: string, chatRoomId: string},reactions: IMessage["MessageReaction"]}) => {
+
+      if(!validReactionSet.has(reactionType) || !socket.userId || !socket.rooms.has(chatRoomId)) return console.log("doesnt includes emoji")
+      const result = await this.messageService.addReactionToMessage(messageId, reactionType,socket.userId)
+      if(result !== false){
+
+        socket.to(chatRoomId).emit("messageEvent",{
+          event: "message:reaction",
+          data: {reactions,messageId,chatRoomId, username, reactionType, isDeleting: result === 1}
+        })
+      }
     })
   }
 }
+
+const used = process.memoryUsage().heapUsed
+
+console.log('In KB:', (used / 1024).toFixed(1));  // divide by 1024
+console.log('In MB:', (used / (1024 * 1024)).toFixed(1));

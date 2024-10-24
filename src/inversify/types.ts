@@ -39,4 +39,8 @@ export const TYPES = {
   UserWebSocketHandler: Symbol.for("UserWebSocketHandler"),
   MessageWebSocketHandler: Symbol.for("MessageWebSocketHandler"),
   NotificationWebSocketHandler: Symbol.for("NotificationWebSocketHandler"),
+
+
+  EventManager: Symbol.for("EventManager"),
+
 };

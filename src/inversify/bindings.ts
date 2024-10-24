@@ -25,6 +25,7 @@ import NotificationWebSocketHandler from "../modules/notification/notification.w
 import MessageControllers from "../modules/messages/message.controller";
 import { MessageService } from "../modules/messages/message.services";
 import { MessageRepository } from "../modules/messages/message.repository";
+import { EventManager } from "../common/config/eventService";
 
 
 
@@ -41,7 +42,7 @@ container.bind<IUserRepository>(TYPES.UserRepository).to(UserRepository);
 container.bind<UserControllers>(TYPES.UserController).to(UserControllers);
 
 container.bind<IAuthService>(TYPES.AuthService).to(AuthService)
-container.bind<IAuthRepository>(TYPES.AuthRepository).to(AuthRepository)
+container.bind<AuthRepository>(TYPES.AuthRepository).to(AuthRepository)
 container.bind<AuthController>(TYPES.AuthController).to(AuthController)
 
 container.bind<FriendshipRepository>(TYPES.FriendshipRepository).to(FriendshipRepository)
@@ -64,5 +65,6 @@ container.bind<IConnectionEventHandler>(TYPES.MessageWebSocketHandler).to(Messag
 container.bind<IConnectionEventHandler>(TYPES.NotificationWebSocketHandler).to(NotificationWebSocketHandler)
 
 
+container.bind<EventManager>(TYPES.EventManager).to(EventManager).inSingletonScope()
 
 export default container;

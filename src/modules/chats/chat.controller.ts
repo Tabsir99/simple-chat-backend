@@ -4,12 +4,13 @@ import { TYPES } from "../../inversify/types";
 import ChatServices from "./chat.services";
 import { formatResponse } from "../../common/utils/responseFormatter";
 import { WebSocketManager } from "../../common/websockets/websocket";
+import { EventManager } from "../../common/config/eventService";
 
 @injectable()
 export default class ChatControllers {
   constructor(
     @inject(TYPES.ChatService) private chatServices: ChatServices,
-    @inject(TYPES.WebSocketManager) private webSocketManager: WebSocketManager
+    @inject(TYPES.EventManager) private eventManager: EventManager
   ) {}
 
   getAllUserChats = async (req: Request, res: Response) => {
@@ -33,24 +34,29 @@ export default class ChatControllers {
   };
 
   getChatById = async (req: Request, res: Response) => {
-    const fetchAll = req.query.all === "true"?true:false
-    const chatRoomId = req.params.chatId as string
+    const fetchAll = req.query.all === "true" ? true : false;
+    const chatRoomId = req.params.chatId as string;
 
-    const result = await this.chatServices.getChatRoomDetails(chatRoomId, fetchAll)
+    const result = await this.chatServices.getChatRoomDetails(
+      chatRoomId,
+      fetchAll
+    );
 
+    if (!result) {
+      return res.status(500).json(
+        formatResponse({
+          success: false,
+          message: "Internal server error",
+        })
+      );
+    }
 
-    if(!result){
-    return res.status(500).json(
+    return res.json(
       formatResponse({
-        success: false,
-        message: "Internal server error",
+        success: true,
+        data: result,
       })
-    );}
-
-    return res.json(formatResponse({
-      success: true,
-      data: result
-    }))
+    );
   };
 
   updateChat = async (req: Request, res: Response) => {
@@ -74,11 +80,14 @@ export default class ChatControllers {
         true
       );
 
-      this.webSocketManager.sendMessage({
-        event: "userEvent",
-        users: "",
-        message: {data: "",event: ""}
-      })
+      this.eventManager.emit<{
+        chatRoomId: string;
+        users: { username: string; userId: string }[];
+      }>("chatRoom:create", {
+        chatRoomId: result.chatRoom.chatRoomId,
+        users: users,
+      });
+      
       res.json(
         formatResponse({
           success: true,

@@ -56,23 +56,21 @@ export default class FriendshipService {
   ) => {
     try {
       if (status === "") {
-        const da = await this.friendshipRepository.deleteFriendship(
+        const result = await this.friendshipRepository.deleteFriendship(
           userId,
           friendId
         );
 
-        if (da.count === 0) {
-          return {
-            success: false,
-          };
+        if (result.count === 0) {
+          throw new Error("No friendship found");
         }
-        return {
-          success: true,
-          message: "Friendship removed",
-        };
+        return {status: "deleted"};
       }
 
-      let response;
+      let response: {
+        status: string;
+        chatRoomId?: string;
+      } | null = null;
       if (status === "accepted") {
         response = await this.friendshipRepository.acceptFriendship(
           userId,
@@ -80,7 +78,11 @@ export default class FriendshipService {
         );
 
         (async () => {
-          await redisClient.pipeline().del(`${userId}:friends`).del(`${friendId}:friends`).exec()
+          await redisClient
+            .pipeline()
+            .del(`${userId}:friends`)
+            .del(`${friendId}:friends`)
+            .exec();
         })();
       }
 
@@ -90,17 +92,14 @@ export default class FriendshipService {
           friendId
         );
       }
-      return {
-        success: true,
-        message: `Friend request ${status} successfully.`,
-        status: response?.status,
-      };
+      return response;
+      
     } catch (error) {
       console.log(error, "FROM FRND SERVICE HANDLE FRIEND REQUEST");
       if (error instanceof PrismaClientKnownRequestError) {
-        return { code: error.code };
+        return null;
       }
-      return { error };
+      return null;
     }
   };
 
@@ -124,7 +123,6 @@ export default class FriendshipService {
       const friendsCountCache = await redisClient.get(`${userId}:friends`);
 
       if (!friendsCountCache) {
-        console.log("Friends fetched from database");
         const friendsCount =
           await this.friendshipRepository.findAllFriendsIdByUser(userId);
 
@@ -134,7 +132,7 @@ export default class FriendshipService {
           JSON.stringify(friendsCount)
         );
 
-        result = friendsCount
+        result = friendsCount;
       } else {
         // console.log("Fetched from the cache, friends");
         result = JSON.parse(friendsCountCache);

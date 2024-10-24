@@ -1,7 +1,7 @@
 import { IUserService } from "../users/user.service.interface";
 import { IEmailService } from "../../common/config/nodemailerConfig";
 import { IConfigService } from "../../common/config/env";
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { JWTVerifyResult, SignJWT, createRemoteJWKSet, jwtVerify } from "jose";
 import {
   IAuthService,
@@ -10,14 +10,17 @@ import {
 } from "./auth.service.interface";
 import { inject, injectable } from "inversify";
 import { TYPES } from "../../inversify/types";
+import AuthRepository from "./auth.repository";
+import redisClient from "../../common/config/redisConfig";
+import { AuthError } from "../../common/errors/authErrors";
 
 @injectable()
-export default class AuthService implements IAuthService {
+export default class AuthService {
   constructor(
     @inject(TYPES.UserService) private userService: IUserService,
     @inject(TYPES.EmailService) private emailService: IEmailService,
     @inject(TYPES.ConfigService) private configService: IConfigService,
-    @inject(TYPES.AuthRepository) private authRepository: IAuthRepository
+    @inject(TYPES.AuthRepository) private authRepository: AuthRepository
   ) {}
 
   private async generateAccessToken(
@@ -35,32 +38,39 @@ export default class AuthService implements IAuthService {
   private generateRefreshToken(): string {
     return randomBytes(64).toString("hex");
   }
+  private hashToken(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
+  }
 
+  private getExpiry(days: number): Date {
+    const now = new Date();
+    now.setDate(now.getDate() + days);
+    return now;
+  }
   private async handleUserLogin(
     email: string,
     username?: string
   ): Promise<{ refreshToken: string }> {
     try {
       let userID = await this.userService.getUserId(email);
-  
+
       if (!userID) {
         userID = await this.userService.createUser(
           email,
           username || this.userService.generateUsernameFromEmail(email)
         );
       }
-  
+
       const refreshToken = this.generateRefreshToken();
-      await this.authRepository.saveToken(
-        `refreshToken:${refreshToken}`,
-        userID as string,
-        7 * 24 * 3600
-      );
-  
-      return { refreshToken }
+      const hashedToken = this.hashToken(refreshToken);
+      const expiresAt = this.getExpiry(14);
+
+      await this.authRepository.saveToken(hashedToken, userID, expiresAt);
+
+      return { refreshToken };
     } catch (error) {
-      console.log(error, "FROM AUTH SERVICE HANDLE LOG IN")
-      throw new Error("Error handling user login")
+      console.log(error, "FROM AUTH SERVICE HANDLE LOG IN");
+      throw new Error("Error handling user login");
     }
   }
 
@@ -74,27 +84,26 @@ export default class AuthService implements IAuthService {
     const magicLink = `${this.configService.get(
       "baseUrl"
     )}/api/auth/login?token=${token}`;
-    await this.authRepository.saveToken(`linkToken:${token}`, email, 15 * 60);
+    await redisClient.setex(`linkToken:${token}`, 15 * 60, email);
 
     try {
       await this.emailService.sendVerificationEmail(email, magicLink);
-      return true
+      return true;
     } catch (error) {
       console.error("Error occurred", error);
-      throw new Error("Couldnt send verification email")
+      throw new Error("Couldnt send verification email");
     }
   }
 
-  public async emailLogIn(token: string): Promise<{refreshToken: string | null}> {
+  public async emailLogIn(
+    token: string
+  ): Promise<{ refreshToken: string | null }> {
     try {
-      const tokenExists = await this.authRepository.getToken(
-        `linkToken:${token}`
-      );
-
+      const tokenExists = await redisClient.get(`linkToken:${token}`);
       if (!tokenExists) {
         return {
-          refreshToken: null
-        }
+          refreshToken: null,
+        };
       }
 
       const decoded: JWTVerifyResult<{ email: string }> = await jwtVerify(
@@ -102,27 +111,29 @@ export default class AuthService implements IAuthService {
         new TextEncoder().encode(this.configService.get("jwtSecretMagicLink"))
       );
 
-      await this.authRepository.deleteToken(`linkToken:${token}`);
+      await redisClient.del(`linkToken:${token}`);
       const refreshToken = await this.handleUserLogin(decoded.payload.email);
-      return refreshToken
+      return refreshToken;
     } catch (err) {
-      console.log(err, " FROM AUTH SERVICE EMAIL OGIN")
+      console.log(err, " FROM AUTH SERVICE EMAIL OGIN");
       return {
-        refreshToken: null
-      }
+        refreshToken: null,
+      };
     }
   }
 
-  public async googleLogIn(code: string): Promise<{refreshToken: string | null}> {
+  public async googleLogIn(
+    code: string
+  ): Promise<{ refreshToken: string | null }> {
     try {
       const token = await this.exchangeCodeForToken(code);
       const payload = await this.verifyGoogleToken(token.id_token);
       const result = await this.handleUserLogin(payload.email);
-      return result
+      return result;
     } catch (error) {
       return {
-        refreshToken: null
-      }
+        refreshToken: null,
+      };
     }
   }
 
@@ -172,51 +183,60 @@ export default class AuthService implements IAuthService {
   public verifyOrRefreshToken = async (
     refreshToken: string
   ): Promise<{ newAccessToken: string; newRefreshToken: string }> => {
-
-    const isValid = await this.authRepository.getToken(
-        `refreshToken:${refreshToken}`
+    try {
+      const oldToken = await this.authRepository.getToken(
+        this.hashToken(refreshToken)
       );
 
-      // console.log(`Provided refresh toekn:${refreshToken.slice(0,10)}\ntime:${new Date().toISOString()}`)
-
-      // console.log("Verifyorrefresh service running, ",isValid)
-      if (!isValid) {
-        throw new Error("Invalid Refresh Token, from getToken");
+      if (!oldToken) {
+        throw AuthError.tokenNotFound({ refreshToken });
       }
-      const tokenValue = isValid[0][1] as string;
-      const tokenTtl = isValid[1][1] as number;
-
-      if (!tokenValue || !tokenTtl) {
-        throw new Error(`"Invalid Refresh Token, from tokenTTl "\n ${tokenTtl}\n ${tokenValue}`);
+      if (oldToken.expiresAt < new Date() && oldToken.isValid) {
+        throw AuthError.tokenExpired({
+          oldTokenId: oldToken.tokenId,
+        });
+      }
+      if (!oldToken.isValid) {
+        if (oldToken.tokenFamily.isValid) {
+          await this.authRepository.revokeFamily(oldToken.tokenFamily.familyId);
+          throw AuthError.invalidToken({
+            threat: true,
+          });
+        }
+        throw AuthError.invalidToken({
+          threat: false,
+        });
       }
 
       const newAccessToken = await this.generateAccessToken(
-        { userId: tokenValue },
-        "20m",
+        { userId: oldToken.userId },
+        "30m",
         this.configService.get("jwtSecretAccess")
       );
 
       const newRefreshToken = this.generateRefreshToken();
+      const newRefreshTokenHash = this.hashToken(newRefreshToken);
 
-      // console.log(`new refresh tokne generated, \nold:${refreshToken.slice(0,10)}\n new:${newRefreshToken.slice(0,10)}\n${new Date().toISOString()}`)
       await this.authRepository.rotateToken(
-        `refreshToken:${refreshToken}`,
-        `refreshToken:${newRefreshToken}`,
-        tokenValue,
-        tokenTtl
+        {
+          expiresAt: oldToken.expiresAt,
+          familyId: oldToken.tokenFamily.familyId,
+          tokenId: oldToken.tokenId,
+        },
+        newRefreshTokenHash,
+        oldToken.userId
       );
 
       return { newAccessToken, newRefreshToken };
-    
-  };
-
-  deleteRefreshToken = async (token: string) => {
-    try {
-      await this.authRepository.deleteToken(`refreshToken:${token}`);
-      return true;
     } catch (error) {
-      console.log(error, 'FROM AUTH SERVICE DELETE REF TOKEN');
-      return false;
+      if (error instanceof AuthError) {
+        if (error.errorCode === "TOKEN_EXPIRED") {
+          await this.authRepository.revokeToken(error.details?.oldTokenId as string);
+          throw error;
+        }
+      }
+      throw AuthError.invalidToken({ expiredIn: error });
     }
   };
+
 }

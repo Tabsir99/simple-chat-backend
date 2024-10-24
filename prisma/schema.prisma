@@ -19,7 +19,6 @@ enum UserStatus {
   away
 }
 
-
 enum FriendshipStatus {
   pending
   accepted
@@ -44,20 +43,11 @@ enum MessageStatus {
   failed
 }
 
-enum ReactionType {
-  thumbs_up
-  heart
-  smile
-  celebration
-  haha
-  thinking
-  angry
-}
-
 enum MessageType {
   user
   system
 }
+
 model User {
   userId         String   @id @default(uuid()) @db.Uuid
   username       String   @db.VarChar(50)
@@ -67,7 +57,7 @@ model User {
   profilePicture String?  @db.VarChar(250)
   bio            String?  @db.VarChar(500)
 
-  lastActive DateTime  @db.Timestamp(6) @default(now())
+  lastActive DateTime   @default(now()) @db.Timestamp(6)
   userStatus UserStatus @default(offline)
 
   ChatRoomMember  ChatRoomMember[]
@@ -79,6 +69,8 @@ model User {
   RecentActivity  RecentActivity?
   ChatRoom        ChatRoom[]
   Message         Message[]
+  RefreshTokens   RefreshTokens[]
+  TokenFamily     TokenFamily[]
 
   @@index([email])
   @@index([lastActive])
@@ -87,7 +79,7 @@ model User {
 model ChatRoom {
   chatRoomId    String   @id @default(uuid()) @db.Uuid
   isGroup       Boolean  @default(false)
-  roomName      String   @db.VarChar(100)
+  roomName      String?  @db.VarChar(100)
   createdAt     DateTime @default(now()) @db.Timestamp(6)
   lastActivity  DateTime @default(now()) @db.Timestamp(6)
   lastMessageId String?  @db.Uuid
@@ -104,21 +96,20 @@ model ChatRoom {
 }
 
 model Message {
-  messageId       String   @id @default(uuid()) @db.Uuid
-  chatRoomId      String   @db.Uuid
-  senderId        String?   @db.Uuid
-  content         String   @db.VarChar(2000)
-  parentMessageId String?  @db.Uuid
-  createdAt       DateTime @default(now()) @db.Timestamp(6)
-  isDeleted       Boolean  @default(false)
-  isEdited        Boolean  @default(false)
-  type MessageType @default(user)
-  status        MessageStatus @default(sent)
-
+  messageId       String        @id @default(uuid()) @db.Uuid
+  chatRoomId      String        @db.Uuid
+  senderId        String?       @db.Uuid
+  content         String        @db.VarChar(2000)
+  parentMessageId String?       @db.Uuid
+  createdAt       DateTime      @default(now()) @db.Timestamp(6)
+  isDeleted       Boolean       @default(false)
+  isEdited        Boolean       @default(false)
+  type            MessageType   @default(user)
+  status          MessageStatus @default(sent)
 
   // Relations
   chatRoom      ChatRoom @relation(fields: [chatRoomId], references: [chatRoomId], onDelete: Cascade)
-  sender        User?     @relation(fields: [senderId], references: [userId], onDelete: Cascade)
+  sender        User?    @relation(fields: [senderId], references: [userId], onDelete: Cascade)
   parentMessage Message? @relation("MessageReplies", fields: [parentMessageId], references: [messageId])
 
   Replies         Message[]         @relation("MessageReplies")
@@ -142,10 +133,10 @@ model Attachment {
 }
 
 model MessageReceipt {
-  lastReadMessageId String        @db.Uuid
-  userId            String        @db.Uuid
-  chatRoomId        String        @db.Uuid
-  readAt            DateTime      @default(now()) @db.Timestamp(6)
+  lastReadMessageId String   @db.Uuid
+  userId            String   @db.Uuid
+  chatRoomId        String   @db.Uuid
+  readAt            DateTime @default(now()) @db.Timestamp(6)
 
   message        Message        @relation(fields: [lastReadMessageId], references: [messageId], onDelete: Cascade)
   chatRoomMember ChatRoomMember @relation(fields: [userId, chatRoomId], references: [userId, chatRoomId])
@@ -194,17 +185,16 @@ model ChatRoomMember {
 }
 
 model MessageReaction {
-  messageReactionId String       @id @default(uuid()) @db.Uuid
-  messageId         String       @db.Uuid // Foreign key referencing Message
-  userId            String       @db.Uuid // Foreign key referencing User
-  reactionType      ReactionType
-  createdAt         DateTime     @default(now()) @db.Timestamp(6)
+  messageId    String   @db.Uuid // Foreign key referencing Message
+  userId       String   @db.Uuid // Foreign key referencing User
+  reactionType String   @db.VarChar(20)
+  createdAt    DateTime @default(now()) @db.Timestamp(6)
 
   // Relations
   message Message @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
-  @@unique([messageId, userId, reactionType]) // Ensure unique combination of message, user, and reaction
+  @@id([messageId, userId])
   @@index([messageId])
   @@index([userId])
 }
@@ -221,4 +211,32 @@ model RecentActivity {
 
   @@unique([userId])
   @@index([userId])
+}
+
+model TokenFamily {
+  familyId String   @id @default(uuid()) @db.Uuid
+  userId   String   @db.Uuid
+  issuedAt DateTime @default(now())
+  isValid Boolean @default(false)
+
+  user          User            @relation(fields: [userId], references: [userId])
+  RefreshTokens RefreshTokens[]
+}
+
+model RefreshTokens {
+  tokenId  String @id @default(uuid()) @db.Uuid
+  userId   String @db.Uuid
+  familyId String @db.Uuid
+
+  tokenHash String @db.VarChar(256)
+
+  issuedAt  DateTime @default(now())
+  expiresAt DateTime
+
+  isValid    Boolean   @default(true)
+
+  user        User        @relation(fields: [userId], references: [userId])
+  tokenFamily TokenFamily @relation(fields: [familyId], references: [familyId])
+
+  @@unique([tokenHash])
 }

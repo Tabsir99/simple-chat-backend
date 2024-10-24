@@ -4,13 +4,15 @@ import FriendshipService from "./frnd.services";
 import { Request, Response } from "express";
 import { formatResponse } from "../../common/utils/responseFormatter";
 import { WebSocketManager } from "../../common/websockets/websocket";
+import { EventManager } from "../../common/config/eventService";
 
 @injectable()
 export default class FriendshipController {
   constructor(
     @inject(TYPES.FriendshipService)
     private friendshipService: FriendshipService,
-    @inject(TYPES.WebSocketManager) private webSocketManager: WebSocketManager
+    @inject(TYPES.WebSocketManager) private webSocketManager: WebSocketManager,
+    @inject(TYPES.EventManager) private eventManager: EventManager
   ) {}
 
   createFriendRequest = async (req: Request, res: Response) => {
@@ -50,7 +52,7 @@ export default class FriendshipController {
     const userId = req.user.userId as string
 
     const response = await this.friendshipService.handleFriendRequest(userId, friendId, status)
-    if(response.success){
+    if(response){
       if(response.status === "accepted"){
         this.webSocketManager.sendMessage({
           event: "userEvent",
@@ -60,25 +62,26 @@ export default class FriendshipController {
             data: {}
           }
         })
+
+        this.eventManager.emit<{
+          chatRoomId: string;
+          users: { username: string; userId: string }[];
+        }>("chatRoom:create", {
+          chatRoomId: response.chatRoomId as string,
+          users: [{userId: userId,username: ""},{userId: friendId,username: ""}],
+        });
       }
         return res.json(formatResponse({
           success: true,
-          message: response.message,
+          message: "Operation succesful",
           data: {
             status: response.status
           }
         }))
     }
 
-    if(response.code === "P2025"){
-      return res.status(404).json(formatResponse({
-        success: false
-      }))
-    }
-    return res.status(500).json(formatResponse({
+    return res.status(401).json(formatResponse({
       success: false,
-      message: "Some error occured",
-
     }))
   };
 

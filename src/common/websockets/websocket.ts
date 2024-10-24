@@ -6,6 +6,7 @@ import { inject, injectable } from "inversify";
 import { jwtVerify } from "jose";
 import config from "../config/env";
 import { TYPES } from "../../inversify/types";
+import { EventManager } from "../config/eventService";
 
 export interface IConnectedUser {
   userId: string | undefined;
@@ -14,7 +15,7 @@ export interface IConnectedUser {
 }
 
 export interface IWebSocketHandler {
-  handle(socket: Socket, connectedUsers: Map<string, IConnectedUser>): void;
+  handle(socket: Socket, connectedUsers: Map<string, IConnectedUser>): Promise<void>;
 }
 
 // New interface for connection event handlers
@@ -41,7 +42,8 @@ export class WebSocketManager {
     @inject(TYPES.MessageWebSocketHandler)
     private messageHandler: IConnectionEventHandler,
     @inject(TYPES.NotificationWebSocketHandler)
-    private notificationHandler: IConnectionEventHandler
+    private notificationHandler: IConnectionEventHandler,
+    @inject(TYPES.EventManager) private eventManager: EventManager
   ) {
     this.connectionEventHandlers = [
       this.chatHandler,
@@ -61,6 +63,7 @@ export class WebSocketManager {
     });
     this.setupMiddleware();
     this.setupHandlers();
+    this.setUpNodeListeners()
   }
 
   private setupMiddleware(): void {
@@ -97,7 +100,6 @@ export class WebSocketManager {
       const userId = socket.userId as string;
       this.addUser(userId, socket.id);
 
-      
       // Notify handlers of new connection
       this.connectionEventHandlers.forEach((handler) => {
         if (handler.onConnect) {
@@ -132,6 +134,19 @@ export class WebSocketManager {
     this.connectedUsers.delete(userId);
   }
 
+  private setUpNodeListeners = () => {
+    const io = this.io
+    if(!io) return
+    this.eventManager.on<{chatRoomId: string, users: {username: string, userId: string}[]}>("chatRoom:create",(data) => {
+      data?.users.forEach(user => {
+        const connectedUser = this.connectedUsers.get(user.userId)
+        console.log(connectedUser)
+        if(connectedUser){
+          this.io?.in(connectedUser.socketId).socketsJoin(data.chatRoomId)
+        }
+      })
+    })
+  }
   sendMessage({
     event,
     message,

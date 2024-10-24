@@ -45,13 +45,13 @@ export async function refreshMiddleware(req: Request, res: Response, next: NextF
     }
     // console.log("refresh acccesstoken middleware running, recived refresh token \n refreshToken:",refreshToken)
 
-    if(typeof refreshToken !== "string" || refreshToken.length !== 128){
-        console.log("Invalid refresh token, from refreshMiddleare")
-        return res.status(401).json(formatResponse({
-            success: false,
-            message: "Invalid Refresh Token"
-        }))
-    }
+    // if(typeof refreshToken !== "string" || refreshToken.length !== 128){
+    //     console.log("Invalid refresh token, from refreshMiddleare")
+    //     return res.status(401).json(formatResponse({
+    //         success: false,
+    //         message: "Invalid Refresh Token"
+    //     }))
+    // }
 
     // console.log("Preparing to go next ... \n")
     return next()

@@ -46,15 +46,7 @@ app.use("/api", messageRouter)
 // Error-handling middleware
 
 // Error-handling middleware
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error(err.stack); // Log error details (stack trace)
-  
-  res.status(500).json({
-    success: false,
-    message: "Internal server error",
-    error: err.message, // Send back error details (optional)
-  });
-});
+
 
 
 app.all("*", (req, res) => {
@@ -64,6 +56,17 @@ app.all("*", (req, res) => {
       url: req.url,
     })
     .status(404);
+});
+
+app.use((err: Error, _: Request, res: Response) => {
+  console.error(err.stack); // Log error details (stack trace)
+  console.log("From error middleware")
+  
+  res.status(500).json({
+    success: false,
+    message: "Internal server error",
+    error: err.message, // Send back error details (optional)
+  });
 });
 
 const PORT = 3001;

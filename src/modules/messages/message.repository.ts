@@ -176,7 +176,6 @@ export class MessageRepository {
       });
 
       if (lastMessage) {
-
         if (userIds.length === 1) {
           await tx.chatRoomMember.update({
             where: {
@@ -232,10 +231,25 @@ export class MessageRepository {
     // return await prisma.message.delete({ });
   }
 
-  async addReaction(messageId: string, reactionData: any) {
-    return await prisma.messageReaction.create({
-      data: { messageId, ...reactionData },
-    });
+  async toggleReaction(messageId: string, reactionType: string, userId: string) {
+
+    return await prisma.$executeRaw`
+    WITH upsert AS (
+      INSERT INTO "MessageReaction" ("messageId","reactionType","userId")
+      VALUES (${messageId}::uuid,${reactionType},${userId}::uuid)
+      ON CONFLICT ("messageId","userId")
+      DO UPDATE SET "reactionType" = ${reactionType}
+      WHERE "MessageReaction"."messageId" = ${messageId}::uuid
+      AND "MessageReaction"."userId" = ${userId}::uuid
+      AND "MessageReaction"."reactionType" != ${reactionType}
+      RETURNING 1
+    )
+    DELETE FROM "MessageReaction" AS mr
+    WHERE mr."messageId" = ${messageId}::uuid
+    AND mr."userId" = ${userId}::uuid
+    AND mr."reactionType" = ${reactionType}
+    AND NOT EXISTS (SELECT 1 FROM upsert)
+    `
   }
 
   async deleteReaction(reactionId: string) {

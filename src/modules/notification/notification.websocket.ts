@@ -1,18 +1,17 @@
-import { Socket } from "socket.io";
-import { TYPES } from "../../inversify/types";
-import { inject, injectable } from "inversify";
-import { IConnectedUser } from "../../common/websockets/websocket";
-import redisClient from "../../common/config/redisConfig";
+import { injectable } from "inversify";
+import { IConnectedUser, IConnectionEventHandler } from "../../common/websockets/websocket";
+import { Socket, DefaultEventsMap } from "socket.io";
+
 
 @injectable()
-export default class NotificationWebSocketHandler {
+export default class NotificationWebSocketHandler implements IConnectionEventHandler {
 
     constructor(
         // @inject(TYPES.NotificationService) private notificationService: NotificationService
     ) {}
 
-    async handle(socket: Socket, _: Map<string, IConnectedUser>): Promise<void> {
-        const userId = socket.userId as string;
-
+    async handle(socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>, connectedUsers: Map<string, IConnectedUser>): Promise<void> {
+        
     }
+    
 }

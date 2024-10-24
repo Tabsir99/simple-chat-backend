@@ -121,7 +121,7 @@ export default class FriendshipRepository {
   async acceptFriendship(
     userId: string,
     friendId: string
-  ): Promise<{ status: string }> {
+  ): Promise<{ status: string, chatRoomId: string }> {
     const [smallerId, largerId] = [userId, friendId].sort();
 
     return prisma.$transaction(async (tx) => {
@@ -135,9 +135,9 @@ export default class FriendshipRepository {
         select: { status: true },
       });
 
-      await this.findOrCreateChatRoom(tx, smallerId, largerId);
+      const chatRoomId = await this.findOrCreateChatRoom(tx, smallerId, largerId);
 
-      return updatedFriendship;
+      return {status: updatedFriendship.status, chatRoomId: chatRoomId.chatRoomId};
     });
   }
 

@@ -14,9 +14,6 @@ CREATE TYPE "FileType" AS ENUM ('image', 'video', 'document');
 CREATE TYPE "MessageStatus" AS ENUM ('sent', 'delivered', 'seen', 'failed');
 
 -- CreateEnum
-CREATE TYPE "ReactionType" AS ENUM ('thumbs_up', 'heart', 'smile', 'celebration', 'haha', 'thinking', 'angry');
-
--- CreateEnum
 CREATE TYPE "MessageType" AS ENUM ('user', 'system');
 
 -- CreateTable
@@ -38,7 +35,7 @@ CREATE TABLE "User" (
 CREATE TABLE "ChatRoom" (
     "chatRoomId" UUID NOT NULL,
     "isGroup" BOOLEAN NOT NULL DEFAULT false,
-    "roomName" VARCHAR(100) NOT NULL,
+    "roomName" VARCHAR(100),
     "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "lastActivity" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "lastMessageId" UUID,
@@ -113,13 +110,12 @@ CREATE TABLE "ChatRoomMember" (
 
 -- CreateTable
 CREATE TABLE "MessageReaction" (
-    "messageReactionId" UUID NOT NULL,
     "messageId" UUID NOT NULL,
     "userId" UUID NOT NULL,
-    "reactionType" "ReactionType" NOT NULL,
+    "reactionType" VARCHAR(20) NOT NULL,
     "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "MessageReaction_pkey" PRIMARY KEY ("messageReactionId")
+    CONSTRAINT "MessageReaction_pkey" PRIMARY KEY ("messageId","userId")
 );
 
 -- CreateTable
@@ -132,6 +128,29 @@ CREATE TABLE "RecentActivity" (
     "lastUpdated" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "RecentActivity_pkey" PRIMARY KEY ("recentActivityId")
+);
+
+-- CreateTable
+CREATE TABLE "TokenFamily" (
+    "familyId" UUID NOT NULL,
+    "userId" UUID NOT NULL,
+    "issuedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "isValid" BOOLEAN NOT NULL DEFAULT false,
+
+    CONSTRAINT "TokenFamily_pkey" PRIMARY KEY ("familyId")
+);
+
+-- CreateTable
+CREATE TABLE "RefreshTokens" (
+    "tokenId" UUID NOT NULL,
+    "userId" UUID NOT NULL,
+    "familyId" UUID NOT NULL,
+    "tokenHash" VARCHAR(256) NOT NULL,
+    "issuedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "isValid" BOOLEAN NOT NULL DEFAULT true,
+
+    CONSTRAINT "RefreshTokens_pkey" PRIMARY KEY ("tokenId")
 );
 
 -- CreateIndex
@@ -174,13 +193,13 @@ CREATE INDEX "MessageReaction_messageId_idx" ON "MessageReaction"("messageId");
 CREATE INDEX "MessageReaction_userId_idx" ON "MessageReaction"("userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "MessageReaction_messageId_userId_reactionType_key" ON "MessageReaction"("messageId", "userId", "reactionType");
-
--- CreateIndex
 CREATE INDEX "RecentActivity_userId_idx" ON "RecentActivity"("userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "RecentActivity_userId_key" ON "RecentActivity"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RefreshTokens_tokenHash_key" ON "RefreshTokens"("tokenHash");
 
 -- AddForeignKey
 ALTER TABLE "ChatRoom" ADD CONSTRAINT "ChatRoom_lastMessageId_fkey" FOREIGN KEY ("lastMessageId") REFERENCES "Message"("messageId") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -232,3 +251,12 @@ ALTER TABLE "MessageReaction" ADD CONSTRAINT "MessageReaction_userId_fkey" FOREI
 
 -- AddForeignKey
 ALTER TABLE "RecentActivity" ADD CONSTRAINT "RecentActivity_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("userId") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TokenFamily" ADD CONSTRAINT "TokenFamily_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("userId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RefreshTokens" ADD CONSTRAINT "RefreshTokens_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("userId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RefreshTokens" ADD CONSTRAINT "RefreshTokens_familyId_fkey" FOREIGN KEY ("familyId") REFERENCES "TokenFamily"("familyId") ON DELETE RESTRICT ON UPDATE CASCADE;
