@@ -1,7 +1,8 @@
 import { injectable } from "inversify";
 import prisma from "../../common/config/db";
-import { IMessage, IRawMessage } from "./message.interface";
+import { Attachment, IMessage, IRawMessage } from "./message.interface";
 import { $Enums } from "@prisma/client";
+import { getFileTypeFromMimeType } from "../../common/utils/utils";
 
 @injectable()
 export class MessageRepository {
@@ -27,7 +28,7 @@ export class MessageRepository {
         chatRoomId: chatId,
       },
       orderBy: {
-        createdAt: "asc",
+        createdAt: "desc",
       },
       select: {
         messageId: true,
@@ -65,7 +66,10 @@ export class MessageRepository {
 
         Attachment: {
           select: {
-            fileUrl: true,
+            filePath: true,
+            fileName: true,
+            fileSize: true,
+            fileType: true,
           },
         },
       },
@@ -105,6 +109,7 @@ export class MessageRepository {
     chatId: string,
     messageData: IMessage,
     status: "delivered" | "sent" | "seen",
+    attachment?: Attachment,
     notReadBy?: string[]
   ) {
     return await prisma.$transaction([
@@ -120,6 +125,18 @@ export class MessageRepository {
           chatRoomId: chatId,
           senderId: messageData.sender?.userId,
           parentMessageId: messageData.parentMessage?.messageId,
+
+          ...(attachment && {
+            Attachment: {
+              create: {
+                fileName: attachment.fileName,
+                filePath: attachment.filePath,
+                fileSize: attachment.fileSize,
+                fileType: attachment.fileType as $Enums.FileType,
+                chatRoomId: chatId,
+              },
+            },
+          }),
 
           // Relations that message table is depended on
         },
@@ -231,8 +248,11 @@ export class MessageRepository {
     // return await prisma.message.delete({ });
   }
 
-  async toggleReaction(messageId: string, reactionType: string, userId: string) {
-
+  async toggleReaction(
+    messageId: string,
+    reactionType: string,
+    userId: string
+  ) {
     return await prisma.$executeRaw`
     WITH upsert AS (
       INSERT INTO "MessageReaction" ("messageId","reactionType","userId")
@@ -249,7 +269,7 @@ export class MessageRepository {
     AND mr."userId" = ${userId}::uuid
     AND mr."reactionType" = ${reactionType}
     AND NOT EXISTS (SELECT 1 FROM upsert)
-    `
+    `;
   }
 
   async deleteReaction(reactionId: string) {

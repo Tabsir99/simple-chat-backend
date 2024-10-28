@@ -11,8 +11,12 @@ interface MessageReaction {
   userId: string;
 }
 
-interface Attachment {
-  fileUrl: string;
+export interface Attachment {
+  filePath: string;
+  fileName: string;
+  fileSize: number;
+  fileType: $Enums.FileType | string
+  messageId?: string
 }
 
 interface ParentMessage {
@@ -23,29 +27,23 @@ interface ParentMessage {
   content: string;
 }
 
-
 export type Reactions = {
   emoji: string;
   users: string[];
 };
 
-
-
 export interface IRawMessage extends Message {
   sender: User | null;
   parentMessage: ParentMessage | null;
   MessageReaction: MessageReaction[];
-  Attachment: Attachment[]
+  Attachment: Attachment[];
 }
-
 
 export interface IMessage extends Message {
   MessageReaction: Reactions[];
-  sender: User | null
-  parentMessage: ParentMessage | null
-  Attachment: Attachment[]
+  sender: User | null;
+  parentMessage: ParentMessage | null;
 }
-
 
 type Message = {
   messageId: string;
@@ -53,6 +51,6 @@ type Message = {
   createdAt: Date;
   isEdited?: boolean;
   isDeleted?: boolean;
-  status: $Enums.MessageStatus
-  type: $Enums.MessageType
+  status: $Enums.MessageStatus;
+  type: $Enums.MessageType;
 };

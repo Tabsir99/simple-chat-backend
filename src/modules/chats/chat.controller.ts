@@ -26,7 +26,7 @@ export default class ChatControllers {
         })
       );
     } catch (error) {
-      console.log("Error occured");
+      console.log("Error occured",error instanceof Error && error.message);
       res.status(500).json({
         error: error,
       });

@@ -84,7 +84,7 @@ export class WebSocketManager {
         const userId = payload.payload.userId as string;
         socket.userId = userId;
       } catch (error) {
-        console.log(error);
+        console.log(error instanceof Error && `${error.message} from websocket`);
         return next(new Error("Token verification failed"));
       }
 

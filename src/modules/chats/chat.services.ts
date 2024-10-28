@@ -1,6 +1,8 @@
 import { inject, injectable } from "inversify";
 import { TYPES } from "../../inversify/types";
 import ChatRepository from "./chat.repository";
+import { getMimeType } from "../../common/utils/utils";
+import { $Enums } from "@prisma/client";
 
 @injectable()
 export default class ChatServices {
@@ -32,8 +34,15 @@ export default class ChatServices {
           !chat.isGroup && chat.ChatRoomMember[0].user.userId,
 
         unreadCount: unreadCountMap.get(chat.chatRoomId) || 0,
-        lastMessage: chat.lastMessage?.content,
-        lastMessageSenderId: chat.lastMessage?.senderId,
+        lastMessage: {
+          content: chat.lastMessage?.content,
+          sender: chat.lastMessage?.sender,
+          attachmentType:
+            chat.lastMessage?.Attachment[0] &&
+            getMimeType(
+              chat.lastMessage?.Attachment[0].fileType as $Enums.FileType
+            ),
+        },
         lastActivity: chat.lastActivity,
       }));
 
@@ -77,7 +86,7 @@ export default class ChatServices {
           media: result?.Messages.flatMap((message) =>
             message.Attachment.map((attachment) => ({
               fileType: attachment.fileType,
-              fileName: attachment.fileUrl,
+              fileName: attachment.filePath,
             }))
           ),
           members: result?.ChatRoomMember.map((member) => {
@@ -98,7 +107,7 @@ export default class ChatServices {
         const formattedResult = result?.Messages.flatMap((message) =>
           message.Attachment.map((attachment) => ({
             fileType: attachment.fileType,
-            fileName: attachment.fileUrl,
+            fileName: attachment.filePath,
           }))
         );
 
@@ -111,7 +120,9 @@ export default class ChatServices {
   };
 
   getChatRoomList = async (userId: string) => {
-    const chatRoomList = await this.chatRepository.getChatRoomListByUserId(userId)
-    return chatRoomList.map(chatRoom => chatRoom.chatRoom.chatRoomId)
-  }
+    const chatRoomList = await this.chatRepository.getChatRoomListByUserId(
+      userId
+    );
+    return chatRoomList.map((chatRoom) => chatRoom.chatRoom.chatRoomId);
+  };
 }

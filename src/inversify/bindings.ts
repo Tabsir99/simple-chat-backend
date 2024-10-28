@@ -26,6 +26,8 @@ import MessageControllers from "../modules/messages/message.controller";
 import { MessageService } from "../modules/messages/message.services";
 import { MessageRepository } from "../modules/messages/message.repository";
 import { EventManager } from "../common/config/eventService";
+import { MediaService } from "../modules/media/media.services";
+import { MediaController } from "../modules/media/media.controller";
 
 
 
@@ -56,6 +58,10 @@ container.bind<ChatRepository>(TYPES.ChatRepository).to(ChatRepository)
 container.bind<MessageControllers>(TYPES.MessageController).to(MessageControllers)
 container.bind<MessageService>(TYPES.MessageService).to(MessageService)
 container.bind<MessageRepository>(TYPES.MessageRepository).to(MessageRepository)
+
+container.bind<MediaService>(TYPES.MediaService).to(MediaService)
+container.bind<MediaController>(TYPES.MediaController).to(MediaController)
+
 
 
 container.bind<WebSocketManager>(TYPES.WebSocketManager).to(WebSocketManager).inSingletonScope()

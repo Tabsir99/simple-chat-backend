@@ -2,6 +2,7 @@ import { Router } from "express";
 import container from "../../inversify/bindings";
 import { TYPES } from "../../inversify/types";
 import MessageControllers from "./message.controller";
+import authMiddleware from "../../common/middlewares/authMiddleware";
 
 
 
@@ -9,6 +10,7 @@ import MessageControllers from "./message.controller";
 const messageControllers = container.get<MessageControllers>(TYPES.MessageController)
 
 const messageRouter = Router()
+messageRouter.use(authMiddleware)
 
 messageRouter.get("/chats/:chatId/messages", messageControllers.getMessagesByChatId)
 

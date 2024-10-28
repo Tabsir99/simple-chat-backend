@@ -5,7 +5,6 @@ import { randomUUID } from "crypto";
 @injectable()
 export default class ChatRepository {
   findChatsByUserId = async (userId: string) => {
-    
     return await prisma.chatRoom.findMany({
       where: {
         ChatRoomMember: {
@@ -20,7 +19,8 @@ export default class ChatRepository {
         lastMessage: {
           select: {
             content: true,
-            senderId: true,
+            sender: { select: { userId: true, username: true } },
+            Attachment: { select: { fileType: true } },
           },
         },
         roomName: true,
@@ -33,7 +33,6 @@ export default class ChatRepository {
             NOT: {
               userId: userId,
             },
-            
           },
           select: {
             user: {
@@ -41,11 +40,11 @@ export default class ChatRepository {
                 userStatus: true,
                 username: true,
                 userId: true,
-                profilePicture: true
+                profilePicture: true,
               },
             },
           },
-          take: 1
+          take: 1,
         },
       },
       orderBy: { lastActivity: "desc" },
@@ -78,7 +77,11 @@ export default class ChatRepository {
       const chatRoom = await tx.chatRoom.create({
         data: {
           isGroup: isGroup,
-          createdBy: isGroup?(isUser1Creator ? users[0].userId : users[1].userId):null,
+          createdBy: isGroup
+            ? isUser1Creator
+              ? users[0].userId
+              : users[1].userId
+            : null,
           roomName: `${users[0].username},${users[1].username}`,
           ChatRoomMember: {
             createMany: {
@@ -86,13 +89,12 @@ export default class ChatRepository {
             },
           },
         },
-      
+
         select: {
           chatRoomId: true,
           isGroup: true,
           roomName: true,
           createdBy: true,
-          
         },
       });
 
@@ -143,7 +145,7 @@ export default class ChatRepository {
             Attachment: {
               select: {
                 fileType: true,
-                fileUrl: true,
+                filePath: true,
               },
             },
           },
@@ -163,7 +165,7 @@ export default class ChatRepository {
             Attachment: {
               select: {
                 fileType: true,
-                fileUrl: true,
+                filePath: true,
               },
             },
           },

@@ -8,7 +8,7 @@ CREATE TYPE "FriendshipStatus" AS ENUM ('pending', 'accepted', 'blocked');
 CREATE TYPE "ChatRole" AS ENUM ('member', 'admin');
 
 -- CreateEnum
-CREATE TYPE "FileType" AS ENUM ('image', 'video', 'document');
+CREATE TYPE "FileType" AS ENUM ('IMAGE_JPEG', 'IMAGE_PNG', 'IMAGE_GIF', 'IMAGE_WEBP', 'IMAGE_SVG', 'PDF', 'DOC', 'DOCX', 'XLS', 'XLSX', 'TXT', 'HTML', 'CSS', 'CSV', 'AUDIO_MP3', 'AUDIO_WAV', 'AUDIO_M4A', 'VIDEO_MP4', 'VIDEO_WEBM', 'ZIP', 'RAR', 'OTHER');
 
 -- CreateEnum
 CREATE TYPE "MessageStatus" AS ENUM ('sent', 'delivered', 'seen', 'failed');
@@ -63,13 +63,15 @@ CREATE TABLE "Message" (
 
 -- CreateTable
 CREATE TABLE "Attachment" (
-    "attachmentId" UUID NOT NULL,
-    "fileUrl" CHAR(500) NOT NULL,
+    "filePath" VARCHAR(255) NOT NULL,
     "fileType" "FileType" NOT NULL,
+    "fileName" VARCHAR(200) NOT NULL,
+    "fileSize" INTEGER NOT NULL,
     "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "messageId" UUID NOT NULL,
+    "chatRoomId" UUID NOT NULL,
 
-    CONSTRAINT "Attachment_pkey" PRIMARY KEY ("attachmentId")
+    CONSTRAINT "Attachment_pkey" PRIMARY KEY ("filePath")
 );
 
 -- CreateTable
@@ -101,7 +103,6 @@ CREATE TABLE "ChatRoomMember" (
     "userId" UUID NOT NULL,
     "userRole" "ChatRole" NOT NULL DEFAULT 'member',
     "joinedAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "muteUntil" TIMESTAMP(6),
     "unreadCount" INTEGER NOT NULL DEFAULT 0,
     "nickName" VARCHAR(50),
 
@@ -218,6 +219,9 @@ ALTER TABLE "Message" ADD CONSTRAINT "Message_parentMessageId_fkey" FOREIGN KEY 
 
 -- AddForeignKey
 ALTER TABLE "Attachment" ADD CONSTRAINT "Attachment_messageId_fkey" FOREIGN KEY ("messageId") REFERENCES "Message"("messageId") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Attachment" ADD CONSTRAINT "Attachment_chatRoomId_fkey" FOREIGN KEY ("chatRoomId") REFERENCES "ChatRoom"("chatRoomId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "MessageReceipt" ADD CONSTRAINT "MessageReceipt_lastReadMessageId_fkey" FOREIGN KEY ("lastReadMessageId") REFERENCES "Message"("messageId") ON DELETE CASCADE ON UPDATE CASCADE;

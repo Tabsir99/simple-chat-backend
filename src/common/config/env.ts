@@ -24,6 +24,7 @@ const config = {
 
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
   googleClientId: process.env.GOOGLE_CLIENT_ID as string,
+  firebaseKey: process.env.FIREBASE_CLOUD_STORAGE_KEY as string,
 
   env: process.env.NODE_ENV as "development" | "test" | "production"
 };

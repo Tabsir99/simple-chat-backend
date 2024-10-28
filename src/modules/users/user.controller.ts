@@ -72,6 +72,7 @@ export default class UserControllers {
     const userId = req.user.userId as string;
     const query = req.query
 
+    console.log(userId)
     try {
       const userInfo = await this.userService.getUserInfo(userId, userId, query);
       if (!userInfo) {

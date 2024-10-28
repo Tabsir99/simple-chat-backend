@@ -32,7 +32,8 @@ export class UserRepository implements IUserRepository {
             totalNewFriendRequests: 0,
             totalNewUnseenChats: 0,
             unseenAcceptedFriendRequests: 0,
-            userId: userId.userId
+            userId: userId.userId,
+            lastUpdated: new Date()
           }
         })
 
@@ -113,8 +114,7 @@ export class UserRepository implements IUserRepository {
       where: {
         userId: userId
       },
-      data: data,
-
+      data: {...data,lastUpdated: new Date()},
     })
   }
 }

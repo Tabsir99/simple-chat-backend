@@ -68,17 +68,11 @@ export default class FriendshipRepository {
     const [smallerId, LargerId] = [senderId, targetUserId].sort();
 
     return await prisma.$transaction([
-      prisma.recentActivity.upsert({
+      prisma.recentActivity.update({
         where: {
           userId: targetUserId,
         },
-        create: {
-          userId: targetUserId,
-          totalNewFriendRequests: 1,
-          totalNewUnseenChats: 0,
-          unseenAcceptedFriendRequests: 0,
-        },
-        update: {
+        data: {
           totalNewFriendRequests: {
             increment: 1,
           },

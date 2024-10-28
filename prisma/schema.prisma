@@ -31,9 +31,39 @@ enum ChatRole {
 }
 
 enum FileType {
-  image
-  video
-  document
+  // Images
+  IMAGE_JPEG
+  IMAGE_PNG
+  IMAGE_GIF
+  IMAGE_WEBP
+  IMAGE_SVG
+
+  // Documents
+  PDF
+  DOC
+  DOCX
+  XLS
+  XLSX
+  TXT
+  HTML
+  CSS
+  CSV
+
+  // Audio
+  AUDIO_MP3
+  AUDIO_WAV
+  AUDIO_M4A
+
+  // Video
+  VIDEO_MP4
+  VIDEO_WEBM
+
+  // Archives
+  ZIP
+  RAR
+
+  // Other
+  OTHER
 }
 
 enum MessageStatus {
@@ -89,8 +119,9 @@ model ChatRoom {
   Messages       Message[] // One-to-many relationship with messages
   ChatRoomMember ChatRoomMember[]
 
-  lastMessage Message? @relation("LastMessage", fields: [lastMessageId], references: [messageId])
-  creator     User?    @relation(fields: [createdBy], references: [userId])
+  lastMessage Message?     @relation("LastMessage", fields: [lastMessageId], references: [messageId])
+  creator     User?        @relation(fields: [createdBy], references: [userId])
+  Attachment  Attachment[]
 
   @@index([lastActivity])
 }
@@ -121,14 +152,19 @@ model Message {
 }
 
 model Attachment {
-  attachmentId String   @id @default(uuid()) @db.Uuid
-  fileUrl      String   @db.Char(500)
-  fileType     FileType
-  createdAt    DateTime @default(now()) @db.Timestamp(6)
-  messageId    String   @db.Uuid
+  filePath String   @db.VarChar(255)
+  fileType FileType
+  fileName String   @db.VarChar(200)
+  fileSize Int
 
-  message Message @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @db.Timestamp(6)
+  messageId  String   @db.Uuid
+  chatRoomId String   @db.Uuid
 
+  message  Message  @relation(fields: [messageId], references: [messageId], onDelete: Cascade)
+  chatRoom ChatRoom @relation(fields: [chatRoomId], references: [chatRoomId], onDelete: Cascade)
+
+  @@id([filePath])
   @@index([messageId])
 }
 
@@ -169,7 +205,6 @@ model ChatRoomMember {
   userId         String           @db.Uuid // Foreign key referencing User
   userRole       ChatRole         @default(member)
   joinedAt       DateTime         @default(now()) @db.Timestamp(6)
-  muteUntil      DateTime?        @db.Timestamp(6) // Nullable timestamp
   unreadCount    Int              @default(0)
   nickName       String?          @db.VarChar(50)
   // Relations
@@ -205,7 +240,7 @@ model RecentActivity {
   totalNewFriendRequests       Int      @default(0)
   totalNewUnseenChats          Int      @default(0)
   unseenAcceptedFriendRequests Int      @default(0)
-  lastUpdated                  DateTime @default(now()) @updatedAt
+  lastUpdated                  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
@@ -217,7 +252,7 @@ model TokenFamily {
   familyId String   @id @default(uuid()) @db.Uuid
   userId   String   @db.Uuid
   issuedAt DateTime @default(now())
-  isValid Boolean @default(false)
+  isValid  Boolean  @default(false)
 
   user          User            @relation(fields: [userId], references: [userId])
   RefreshTokens RefreshTokens[]
@@ -233,7 +268,7 @@ model RefreshTokens {
   issuedAt  DateTime @default(now())
   expiresAt DateTime
 
-  isValid    Boolean   @default(true)
+  isValid Boolean @default(true)
 
   user        User        @relation(fields: [userId], references: [userId])
   tokenFamily TokenFamily @relation(fields: [familyId], references: [familyId])

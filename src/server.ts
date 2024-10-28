@@ -13,8 +13,9 @@ import { WebSocketManager } from "./common/websockets/websocket";
 import container from "./inversify/bindings";
 import { TYPES } from "./inversify/types";
 import messageRouter from "./modules/messages/message.routes";
+import mediaRouter from "./modules/media/media.route";
 
-
+process.env.TZ = "UTC"
 const app = express();
 const httpServer = createServer(app);
 const webSocketManager = container.get<WebSocketManager>(
@@ -30,17 +31,19 @@ app.use(
   cors({
     origin: config.baseUrlFrontend,
     credentials: true,
-    methods: "*"
+    methods: "*",
+    maxAge: 86400
   })
 );
 app.use(cookieParser());
 
 
 app.use("/api",authRoute)
+app.use("/api", messageRouter);
+app.use("/api",mediaRouter)
 app.use("/api", userRoute);
 app.use("/api", friendRoute);
 app.use("/api", chatRoute);
-app.use("/api", messageRouter)
 
 
 // Error-handling middleware
@@ -71,7 +74,7 @@ app.use((err: Error, _: Request, res: Response) => {
 
 const PORT = 3001;
 httpServer.listen(PORT, () => {
-  console.log("Server started at port:", PORT);
+  console.log("Server started at port:", PORT, process.env.TZ);
 });
 
 // Web socket server initializing

@@ -34,13 +34,14 @@ export const TYPES = {
   NotificationRepository: Symbol.for("NotificationRepository"),
   NotificationController: Symbol.for("NotificationController"),
 
+  MediaController: Symbol.for("MediaController"),
+  MediaService: Symbol.for("MediaService"),
+
   WebSocketManager: Symbol.for("WebSocketManager"),
   ChatWebSocketHandler: Symbol.for("ChatWebSocketHandler"),
   UserWebSocketHandler: Symbol.for("UserWebSocketHandler"),
   MessageWebSocketHandler: Symbol.for("MessageWebSocketHandler"),
   NotificationWebSocketHandler: Symbol.for("NotificationWebSocketHandler"),
 
-
   EventManager: Symbol.for("EventManager"),
-
 };

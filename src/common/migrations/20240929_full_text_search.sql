@@ -41,7 +41,7 @@ VALUES (
     NULL,
     NULL,
     '2024-10-24 03:17:08.903',
-    'online'
+    'offline'
   ),
   (
     '84257c89-a864-4f3c-862e-99c9b1c82429',
@@ -52,7 +52,7 @@ VALUES (
     NULL,
     NULL,
     '2024-10-24 03:17:08.903',
-    'online'
+    'offline'
   );
 INSERT INTO "Friendship" (
     "friendshipId",
