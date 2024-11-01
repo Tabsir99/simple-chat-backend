@@ -5,6 +5,7 @@ import { Request, Response } from "express";
 import { formatResponse } from "../../common/utils/responseFormatter";
 import { WebSocketManager } from "../../common/websockets/websocket";
 import { EventManager } from "../../common/config/eventService";
+import { $Enums } from "@prisma/client";
 
 @injectable()
 export default class FriendshipController {
@@ -47,12 +48,25 @@ export default class FriendshipController {
   };
 
   updateFriendship = async (req: Request, res: Response) => {
-    const { status }: {status: "accepted" | "blocked" | ""} = req.body;
+    const { status }: {status: Omit<$Enums.FriendshipStatus,"pending">} = req.body;
     const friendId = req.params.userId as string
     const userId = req.user.userId as string
 
     const response = await this.friendshipService.handleFriendRequest(userId, friendId, status)
     if(response){
+      if(status === "blocked"){
+        this.webSocketManager.sendMessage({
+          event: "userEvent",
+          users: friendId,
+          message: {
+            event: "friend:blocked",
+            data: {
+              blockedUserId: friendId,
+              chatRoomId: response.chatRoomId
+            }
+          }
+        })
+      }
       if(response.status === "accepted"){
         this.webSocketManager.sendMessage({
           event: "userEvent",
@@ -75,7 +89,8 @@ export default class FriendshipController {
           success: true,
           message: "Operation succesful",
           data: {
-            status: response.status
+            status: response.status,
+            chatRoomId: response.chatRoomId
           }
         }))
     }
@@ -89,6 +104,7 @@ export default class FriendshipController {
     const userId = req.user.userId as string
     const result = await this.friendshipService.getFriendList(userId)
 
+    
     res.json(formatResponse({
       success: true,
       data: result

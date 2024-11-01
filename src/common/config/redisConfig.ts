@@ -14,13 +14,13 @@ if (!redisClient) {
   // Set configurations after the client has connected
   redisClient.connect()
     .then(async () => {
-      console.log("Redis client connected");
+      console.info("Redis client connected");
 
       await redisClient?.config('SET', 'maxmemory', '100mb');
       await redisClient?.config('SET', 'maxmemory-policy', 'allkeys-lru');
     })
     .catch((err) => {
-      console.log("Error occurred during Redis connection: ", err?.message);
+      console.error("Error occurred during Redis connection: ", err?.message);
     });
 }
 

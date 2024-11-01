@@ -1,7 +1,12 @@
 import { inject, injectable } from "inversify";
 import { MessageRepository } from "./message.repository";
 import { TYPES } from "../../inversify/types";
-import { Attachment, IMessage, IRawMessage } from "./message.interface";
+import {
+  Attachment,
+  FilterMessageOption,
+  IMessage,
+  IRawMessage,
+} from "./message.interface";
 import { $Enums, FileType } from "@prisma/client";
 import {
   getExtensionFromMimeType,
@@ -9,23 +14,58 @@ import {
   getMimeType,
 } from "../../common/utils/utils";
 import { MediaService } from "../media/media.services";
+import ChatServices from "../chats/chat.services";
+import { MessageError } from "../../common/errors/messageErrors";
 
 type Reactions = {
   emoji: string;
   users: string[];
 }[];
+
 @injectable()
 export class MessageService {
   constructor(
     @inject(TYPES.MessageRepository)
     private messageRepository: MessageRepository,
-    @inject(TYPES.MediaService) private mediaService: MediaService
+    @inject(TYPES.MediaService) private mediaService: MediaService,
+    @inject(TYPES.ChatService) private chatService: ChatServices,
+    
   ) {}
 
-  async getMessagesByChatId(chatId: string, userId: string) {
-    // Add business logic if needed, e.g., validation
+  async getMessagesByChatId(
+    chatId: string,
+    userId: string,
+    cursor: { messageId: string; createdAt: string }
+  ) {
+    const chatRoomMemberInfo = await this.chatService.validateMember(
+      userId,
+      chatId
+    );
+    if (!chatRoomMemberInfo) {
+      throw MessageError.memberAccessDenied()
+    }
+
+    if (!cursor.createdAt || !cursor.messageId) {
+      return this.getInitMessages(chatId, userId, chatRoomMemberInfo);
+    }
+
+    return this.getOlderMessages(chatId, chatRoomMemberInfo, {
+      createdAt: new Date(cursor.createdAt),
+      messageId: cursor.messageId,
+    });
+  }
+
+  private getInitMessages = async (
+    chatId: string,
+    userId: string,
+    chatRoomMemberInfo: FilterMessageOption
+  ) => {
     const [{ rawMessages, oppositeMember }, allRecipts] = await Promise.all([
-      this.messageRepository.findMessagesByChatId(chatId, userId),
+      this.messageRepository.findMessagesByChatId(
+        chatId,
+        userId,
+        chatRoomMemberInfo
+      ),
       this.messageRepository.findAllReciptsByChatId(chatId),
     ]);
 
@@ -42,11 +82,30 @@ export class MessageService {
       })),
       attachments,
     };
-  }
+  };
 
+  private getOlderMessages = async (
+    chatId: string,
+    chatRoomMemberInfo: FilterMessageOption,
+    cursor: { messageId: string; createdAt: Date }
+  ) => {
+    const res = await this.messageRepository.findOlderMessages(
+      chatId,
+      chatRoomMemberInfo,
+      cursor
+    );
+    const { attachments, messages } = this.mapMessages(res || [], undefined);
+
+    return { attachments, messages };
+  };
   async createMessageInChat(
     chatId: string,
-    messageData: IMessage,
+    messageData:  {
+      messageId: string;
+      sender: IMessage["sender"];
+      content?: string;
+      parentMessage?: IMessage["parentMessage"];
+    },
     status: "delivered" | "sent",
     attachment?: Omit<Attachment, "filePath">,
     notReadBy?: string[]
@@ -57,17 +116,18 @@ export class MessageService {
     if (attachment) {
       const path = `chatRoom/${chatId}/${
         messageData.messageId
-      }.${getExtensionFromMimeType(attachment.fileType)}`;
+      }.${attachment.fileName}`;
       attachmentToSave = {
         fileName: attachment.fileName,
         filePath: path,
         fileSize: attachment.fileSize,
         fileType: getFileTypeFromMimeType(attachment.fileType),
       };
-      signedUrlPromise = this.mediaService.getReadSignedUrl(
-        path,
-        {expiresIn: 60*60*1000,fileName: attachment.fileName,contentType: attachment.fileType}
-      );
+      signedUrlPromise = this.mediaService.getReadSignedUrl(path, {
+        expiresIn: 60 * 60 * 1000,
+        fileName: attachment.fileName,
+        contentType: attachment.fileType,
+      });
     }
     const createMessagePromise = this.messageRepository.createMessage(
       chatId,
@@ -77,11 +137,10 @@ export class MessageService {
       notReadBy
     );
 
-    return Promise.all([createMessagePromise,signedUrlPromise])
+    return Promise.all([createMessagePromise, signedUrlPromise]);
   }
 
   async updateMessageRecipt(chatRoomId: string, userIds: string[]) {
-    // console.log("ran create recipt")
     try {
       const result = await this.messageRepository.updateMessageRecipt(
         chatRoomId,
@@ -89,7 +148,7 @@ export class MessageService {
       );
       return result;
     } catch (error) {
-      console.log(
+      console.error(
         "Couldnt create recipt",
         error instanceof Error && error.message
       );
@@ -102,14 +161,9 @@ export class MessageService {
   }
 
   async updateMessage(messageId: string, updateData: any) {
-    // Validate if message exists or add other business logic
     return await this.messageRepository.updateMessage(messageId, updateData);
   }
 
-  async deleteMessage(messageId: string) {
-    // Add business logic, e.g., authorization, if needed
-    return await this.messageRepository.deleteMessage(messageId);
-  }
 
   async addReactionToMessage(
     messageId: string,
@@ -123,22 +177,28 @@ export class MessageService {
         userId
       );
     } catch (error) {
-      console.log(error instanceof Error && error.message);
+      console.error(error instanceof Error && error.message);
       return false;
     }
   }
 
   private mapMessages(
     rawMessages: IRawMessage[],
-    oppositeMember: {
-      userStatus: $Enums.UserStatus;
-      lastActive: Date;
-    }
-  ): { messages: IMessage[]; attachments: (Omit<Attachment,"filePath">&{fileUrl: string})[] } {
-    const attachments: (Omit<Attachment,"filePath">&{fileUrl: string})[] = [];
+    oppositeMember:
+      | {
+          userStatus: $Enums.UserStatus;
+          lastActive: Date;
+        }
+      | undefined
+  ): {
+    messages: IMessage[];
+    attachments: Omit<Attachment, "filePath">[];
+  } {
+    const attachments: Omit<Attachment, "filePath">[] = [];
     const messages = rawMessages.map((rawMessage) => {
       let status: "delivered" | "failed" | "sent" | "seen" = rawMessage.status;
       if (
+        oppositeMember &&
         status === "sent" &&
         (oppositeMember.userStatus === "online" ||
           rawMessage.createdAt < oppositeMember.lastActive)
@@ -149,11 +209,9 @@ export class MessageService {
       if (rawMessage.Attachment.length > 0) {
         attachments.push({
           fileName: rawMessage.Attachment[0].fileName,
-          fileUrl: "",
           fileSize: rawMessage.Attachment[0].fileSize,
           fileType: getMimeType(rawMessage.Attachment[0].fileType as FileType),
           messageId: rawMessage.messageId,
-          
         });
       }
       return {
@@ -186,11 +244,6 @@ export class MessageService {
         status: status,
         sender: rawMessage.sender,
         parentMessage: rawMessage.parentMessage,
-        // Attachment: rawMessage.Attachment && {
-        //   ...rawMessage.Attachment[0],
-        //   fileUrl: "",
-        //   fileType: getMimeType(rawMessage.Attachment[0].fileType),
-        // },
       };
     });
 

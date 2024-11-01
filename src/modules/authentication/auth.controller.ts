@@ -69,7 +69,7 @@ export default class AuthController {
         );
       }
     } catch (error) {
-      console.log(error, " FROM LOGIN WITH EMAIL");
+      console.error(error, " FROM LOGIN WITH EMAIL");
       if (error instanceof Error) {
         return res.json(
           formatResponse({ success: false, message: "Internal Error Occured" })
@@ -91,13 +91,11 @@ export default class AuthController {
     try {
       const response = await this.authService.googleLogIn(code);
 
-      // console.log("Response recivied from googleLogin ,",response)
       if (response.refreshToken) {
         this.cookieManager.setAuthCookies(res, {
           refreshToken: response.refreshToken,
         });
 
-        // console.log("Cookie set ,redirecting....")
         return res.redirect(`${this.config.get("baseUrlFrontend")}/chats`);
       }
     } catch (err) {
@@ -122,7 +120,6 @@ export default class AuthController {
       const { newAccessToken, newRefreshToken } =
         await this.authService.verifyOrRefreshToken(refreshToken);
 
-      // console.log("Refresh token verification succssfull, setting up cookie... \n",refreshToken.slice(0,10))
       this.cookieManager.setAuthCookies(res, {
         refreshToken: newRefreshToken,
       });

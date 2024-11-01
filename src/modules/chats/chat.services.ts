@@ -2,53 +2,41 @@ import { inject, injectable } from "inversify";
 import { TYPES } from "../../inversify/types";
 import ChatRepository from "./chat.repository";
 import { getMimeType } from "../../common/utils/utils";
-import { $Enums } from "@prisma/client";
+import { $Enums, ChatRole, FileType } from "@prisma/client";
+import FriendshipService from "../friendship/frnd.services";
+import { ChatRoomHead } from "./chats.interfaces";
 
 @injectable()
 export default class ChatServices {
   constructor(
-    @inject(TYPES.ChatRepository) private chatRepository: ChatRepository
+    @inject(TYPES.ChatRepository) private chatRepository: ChatRepository,
+    @inject(TYPES.FriendshipService) private frndService: FriendshipService
   ) {}
 
   getChats = async (userId: string) => {
     try {
       const chats = await this.chatRepository.findChatsByUserId(userId);
-      const unreadCounts = await this.chatRepository.findUnreadCountByUserId(
-        userId
-      );
+      const refinedChats: ChatRoomHead[] = chats
+        .map((room) => {
+          const isChatCleared =
+            room.chatClearedAt && room.chatClearedAt > room.lastActivity;
 
-      const unreadCountMap = new Map(
-        unreadCounts.map((item) => [item.chatRoomId, item.unreadCount])
-      );
-
-      const refinedChats = chats.map((chat) => ({
-        chatRoomId: chat.chatRoomId,
-        isGroup: chat.isGroup,
-        roomName: chat.roomName || chat.ChatRoomMember[0].user.username,
-        roomImage: chat.roomImage || chat.ChatRoomMember[0].user.profilePicture,
-
-        roomStatus: chat.isGroup
-          ? "online"
-          : chat.ChatRoomMember[0].user.userStatus,
-        privateChatMemberId:
-          !chat.isGroup && chat.ChatRoomMember[0].user.userId,
-
-        unreadCount: unreadCountMap.get(chat.chatRoomId) || 0,
-        lastMessage: {
-          content: chat.lastMessage?.content,
-          sender: chat.lastMessage?.sender,
-          attachmentType:
-            chat.lastMessage?.Attachment[0] &&
-            getMimeType(
-              chat.lastMessage?.Attachment[0].fileType as $Enums.FileType
-            ),
-        },
-        lastActivity: chat.lastActivity,
-      }));
-
+          return {
+            ...room,
+            unreadCount: room.removedAt || isChatCleared ? 0 : room.unreadCount,
+            lastActivity: room.removedAt ? room.removedAt : room.lastActivity,
+            messageContent: isChatCleared ? null : room.messageContent,
+            fileType: isChatCleared ? null : getMimeType(room.fileType as FileType),
+          };
+        })
+        .sort(
+          (a, b) =>
+            new Date(b.lastActivity).getTime() -
+            new Date(a.lastActivity).getTime()
+        );
       return refinedChats;
     } catch (error) {
-      console.log(error);
+      console.error(error);
       throw new Error("Failed to get all chats");
     }
   };
@@ -69,7 +57,7 @@ export default class ChatServices {
       const result = await this.chatRepository.createChat(newUsers, isGroup);
       return result;
     } catch (error) {
-      console.log(
+      console.error(
         error instanceof Error
           ? error.message
           : "error occured from createChatRom"
@@ -78,51 +66,106 @@ export default class ChatServices {
     }
   };
 
-  getChatRoomDetails = async (chatRoomId: string, fetchAll: boolean) => {
-    try {
-      if (fetchAll) {
-        const result = await this.chatRepository.getChatRoomDetails(chatRoomId);
-        const formattedResult = {
-          media: result?.Messages.flatMap((message) =>
-            message.Attachment.map((attachment) => ({
-              fileType: attachment.fileType,
-              fileName: attachment.filePath,
-            }))
-          ),
-          members: result?.ChatRoomMember.map((member) => {
-            return {
-              memberName: member.user.username,
-              isAdmin: member.userRole === "admin",
-              memberPicture: member.user.profilePicture,
-              memberId: member.user.userId,
-              memberStatus: member.user.userStatus,
-              memberNickname: member.nickName,
-              isCreator: result.createdBy === member.user.userId,
-            };
-          }),
-        };
-        return formattedResult;
-      } else {
-        const result = await this.chatRepository.getChatRoomMedia(chatRoomId);
-        const formattedResult = result?.Messages.flatMap((message) =>
-          message.Attachment.map((attachment) => ({
-            fileType: attachment.fileType,
-            fileName: attachment.filePath,
-          }))
-        );
+  getChatRoomMembers = async (chatRoomId: string) => {
+    const members = await this.chatRepository.getChatRoomMembers(chatRoomId);
 
-        return formattedResult;
-      }
-    } catch (error) {
-      console.log(error);
-      return false;
-    }
+    const modifiedMembers = members?.ChatRoomMember.filter(
+      (m) => m.removedAt === null
+    ).map((member) => {
+      return {
+        ...member.user,
+        isCreator: member.user.userId === members.createdBy,
+        nickName: member.nickName,
+        isAdmin: member.userRole === "admin",
+        removedAt: member.removedAt,
+      };
+    });
+
+    return modifiedMembers;
   };
 
+  getChatRoomMedia = async (chatRoomId: string) => {
+    const media = await this.chatRepository.getChatRoomMedia(chatRoomId);
+    const modifiedMedia = media?.Messages.map((msg) => {
+      return {
+        fileName: msg.Attachment[0].fileName,
+        fileType: msg.Attachment[0].fileType,
+        fileSize: msg.Attachment[0].fileSize,
+      };
+    });
+
+    return modifiedMedia;
+  };
   getChatRoomList = async (userId: string) => {
     const chatRoomList = await this.chatRepository.getChatRoomListByUserId(
       userId
     );
-    return chatRoomList.map((chatRoom) => chatRoom.chatRoom.chatRoomId);
+    return chatRoomList.map((chatRoom) => chatRoom.chatRoomId);
+  };
+
+  updateGroupMember = async (
+    chatRoomId: string,
+    userId: string,
+    action: "promote" | "demote" | "nickname",
+    nickname?: string
+  ) => {
+    let res: { nickName: string | null; userRole: ChatRole | null } = {
+      nickName: null,
+      userRole: null,
+    };
+    if (action === "nickname") {
+      res.nickName = (
+        await this.chatRepository.updateGroupMember(
+          chatRoomId,
+          userId,
+          nickname as string
+        )
+      ).nickName;
+      return res;
+    }
+    res.userRole = (
+      await this.chatRepository.updateGroupMemberRole(
+        chatRoomId,
+        userId,
+        action === "demote" ? "member" : "admin"
+      )
+    ).userRole;
+
+    return res;
+  };
+
+  updateGroupMembership = async (
+    chatRoomId: string,
+    userId: string,
+    currentUserId: string
+  ) => {
+    try {
+      const res = await this.chatRepository.deleteGroupMember(
+        chatRoomId,
+        userId,
+        currentUserId
+      );
+      if (!res) {
+        throw new Error("Not enough permission");
+      }
+      return res;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  validateMember = async (userId: string, chatRoomId: string) => {
+    const res = await this.chatRepository.findChatRoom(userId, chatRoomId);
+
+    return res;
+  };
+
+  clearChat = async (chatRoomId: string, userId: string) => {
+    try {
+      const res = await this.chatRepository.clearChat(chatRoomId, userId);
+      return res;
+    } catch (error) {
+      return false;
+    }
   };
 }

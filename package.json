@@ -27,6 +27,7 @@
     "inversify": "^6.0.2",
     "ioredis": "^5.4.1",
     "jose": "^5.9.3",
+    "lorem-ipsum": "^2.0.8",
     "nodemailer": "^6.9.15",
     "pg": "^8.13.0",
     "reflect-metadata": "^0.2.2",

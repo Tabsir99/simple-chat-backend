@@ -1,8 +1,7 @@
 import { inject, injectable } from "inversify";
 import FriendshipRepository from "./frnd.repository";
 import { TYPES } from "../../inversify/types";
-import { $Enums } from "@prisma/client";
-import ChatServices from "../chats/chat.services";
+import { $Enums, FriendshipStatus } from "@prisma/client";
 import redisClient from "../../common/config/redisConfig";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 
@@ -11,7 +10,6 @@ export default class FriendshipService {
   constructor(
     @inject(TYPES.FriendshipRepository)
     private friendshipRepository: FriendshipRepository,
-    @inject(TYPES.ChatService) private chatService: ChatServices
   ) {}
 
   // Method to get the friendship status between two users
@@ -34,7 +32,7 @@ export default class FriendshipService {
 
       return {
         data: {
-          status: friendshipStatus?.status || "",
+          status: friendshipStatus?.status || "canceled" as FriendshipStatus,
           count: friendsCount?.length || 0,
           senderId: friendshipStatus?.senderId || "",
           blockedUserId: friendshipStatus?.blockedUserId || "",
@@ -52,10 +50,10 @@ export default class FriendshipService {
   handleFriendRequest = async (
     userId: string,
     friendId: string,
-    status: "accepted" | "blocked" | ""
+    status: Omit<FriendshipStatus,"pending">
   ) => {
     try {
-      if (status === "") {
+      if (status === "canceled") {
         const result = await this.friendshipRepository.deleteFriendship(
           userId,
           friendId
@@ -64,12 +62,12 @@ export default class FriendshipService {
         if (result.count === 0) {
           throw new Error("No friendship found");
         }
-        return {status: "deleted"};
+        return {status: "canceled", chatRoomId: null};
       }
 
       let response: {
         status: string;
-        chatRoomId?: string;
+        chatRoomId: string | null;
       } | null = null;
       if (status === "accepted") {
         response = await this.friendshipRepository.acceptFriendship(
@@ -95,7 +93,7 @@ export default class FriendshipService {
       return response;
       
     } catch (error) {
-      console.log(error, "FROM FRND SERVICE HANDLE FRIEND REQUEST");
+      console.error(error, "FROM FRND SERVICE HANDLE FRIEND REQUEST");
       if (error instanceof PrismaClientKnownRequestError) {
         return null;
       }
@@ -112,7 +110,7 @@ export default class FriendshipService {
 
       return true;
     } catch (error) {
-      console.log(error, " FROM FRND SERVICE CREATE FRND REQ");
+      console.error(error, " FROM FRND SERVICE CREATE FRND REQ");
       return false;
     }
   };
@@ -134,12 +132,12 @@ export default class FriendshipService {
 
         result = friendsCount;
       } else {
-        // console.log("Fetched from the cache, friends");
+        // console("Fetched from the cache, friends");
         result = JSON.parse(friendsCountCache);
       }
       return result;
     } catch (error) {
-      console.log(error);
+      console.error(error);
       return undefined;
     }
   };

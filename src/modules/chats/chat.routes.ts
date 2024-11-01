@@ -4,19 +4,19 @@ import container from "../../inversify/bindings";
 import { TYPES } from "../../inversify/types";
 import authMiddleware from "../../common/middlewares/authMiddleware";
 
-const chatController = container.get<ChatControllers>(TYPES.ChatController)
-const chatRoute = Router()
-chatRoute.use(authMiddleware)
+const chatController = container.get<ChatControllers>(TYPES.ChatController);
+const chatRoute = Router();
+chatRoute.use(authMiddleware);
 
-chatRoute.get("/chats", chatController.getAllUserChats)
-chatRoute.get("/chats/:chatId", chatController.getChatById)
+chatRoute.get("/chats", chatController.getAllUserChats);
+chatRoute.get("/chats/:chatId/members", chatController.getGroupMembers);
+chatRoute.get("/chats/:chatId/media", chatController.getGroupMedia);
+chatRoute.delete("/chats/:chatId",chatController.deleteChat)
 
-chatRoute.put("/chats/:chatId", chatController.updateChat)
-chatRoute.post("/chats/:chatId/members",chatController.addChatMember)
-chatRoute.post("/chats/:chatId/admins",chatController.addChatAdmin)
-chatRoute.post("/chats/groups",chatController.createGroupChat)
+chatRoute.put("/chats/members", chatController.updateMember)
+chatRoute.post("/chats/groups", chatController.createGroupChat);
 
-chatRoute.delete("/chats/:chatId/members", chatController.removeChatMember)
-chatRoute.delete("/chats/:chatId/admins", chatController.removeChatAdmin)
+chatRoute.put("/chats/:chatId", chatController.updateChat);
+
 
 export default chatRoute;

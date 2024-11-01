@@ -11,7 +11,6 @@ export default class AuthRepository {
     expiresAt: Date
   ): Promise<any> {
     try {
-      console.log("ran savetoken")
       return await prisma.$transaction(async (tx) => {
         const familyId = await tx.tokenFamily.create({
           data: {
@@ -135,7 +134,7 @@ export default class AuthRepository {
         })
       })
     } catch (error) {
-      console.log(error, " FROM AUTH REPO ROTATE TOKEN");
+      console.error(error, " FROM AUTH REPO ROTATE TOKEN");
       throw new Error("Error rotating token");
     }
   }

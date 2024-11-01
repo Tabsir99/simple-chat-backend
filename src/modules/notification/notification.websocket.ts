@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { IConnectedUser, IConnectionEventHandler } from "../../common/websockets/websocket";
+import { IConnectedUser, IConnectionEventHandler, WebsocketHandlerParams } from "../../common/websockets/websocket";
 import { Socket, DefaultEventsMap } from "socket.io";
 
 
@@ -10,7 +10,7 @@ export default class NotificationWebSocketHandler implements IConnectionEventHan
         // @inject(TYPES.NotificationService) private notificationService: NotificationService
     ) {}
 
-    async handle(socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>, connectedUsers: Map<string, IConnectedUser>): Promise<void> {
+    async handle({ io, socket, connectedUsers }: WebsocketHandlerParams): Promise<void> {
         
     }
     

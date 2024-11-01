@@ -18,7 +18,6 @@ const storage = getStorage(app);
 const bucket = storage.bucket();
 
 // const policy = await bucket.iam.getPolicy()
-// console.log(policy)
 // await bucket.setCorsConfiguration([
 //   {
 //     origin: ["http://localhost:5000"],

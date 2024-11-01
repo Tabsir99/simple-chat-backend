@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { inject, injectable } from "inversify";
 import { TYPES } from "../../inversify/types";
 import ChatServices from "./chat.services";
@@ -26,32 +26,28 @@ export default class ChatControllers {
         })
       );
     } catch (error) {
-      console.log("Error occured",error instanceof Error && error.message);
+      console.error("Error occured", error instanceof Error && error.message);
       res.status(500).json({
         error: error,
       });
     }
   };
 
-  getChatById = async (req: Request, res: Response) => {
-    const fetchAll = req.query.all === "true" ? true : false;
+  getGroupMembers = async (req: Request, res: Response) => {
     const chatRoomId = req.params.chatId as string;
-
-    const result = await this.chatServices.getChatRoomDetails(
-      chatRoomId,
-      fetchAll
+    const result = await this.chatServices.getChatRoomMembers(chatRoomId);
+    res.json(
+      formatResponse({
+        success: true,
+        data: result,
+      })
     );
+  };
 
-    if (!result) {
-      return res.status(500).json(
-        formatResponse({
-          success: false,
-          message: "Internal server error",
-        })
-      );
-    }
-
-    return res.json(
+  getGroupMedia = async (req: Request, res: Response) => {
+    const chatRoomId = req.params.chatId as string;
+    const result = await this.chatServices.getChatRoomMedia(chatRoomId);
+    res.json(
       formatResponse({
         success: true,
         data: result,
@@ -72,7 +68,6 @@ export default class ChatControllers {
     const currentUserId = req.user.userId as string;
     const users = req.body as { userId: string; username: string }[];
 
-    // return console.log(users)
     try {
       const result = await this.chatServices.createChatRoom(
         currentUserId,
@@ -87,7 +82,7 @@ export default class ChatControllers {
         chatRoomId: result.chatRoom.chatRoomId,
         users: users,
       });
-      
+
       res.json(
         formatResponse({
           success: true,
@@ -103,39 +98,78 @@ export default class ChatControllers {
     }
   };
 
-  addChatMember = async (req: Request, res: Response) => {
-    return res.status(500).json(
-      formatResponse({
-        success: false,
-        message: "Internal server error",
-      })
+  updateMember = async (req: Request, res: Response, next: NextFunction) => {
+    const currentUserId = req.user.userId;
+    const { action, chatRoomId, userId,nickname } = req.body as {
+      chatRoomId: string;
+      userId: string;
+      action: "promote" | "demote" | "nickname";
+      nickname?: string;
+    };
+    if (currentUserId === userId && action !== "nickname") {
+      return res.status(400).json(
+        formatResponse({
+          success: false,
+          message: "Can't promote or demote self",
+        })
+      );
+    }
+
+    const result = await this.chatServices.updateGroupMember(
+      chatRoomId,
+      userId,
+      action,
+      nickname
     );
+
+    if (result.userRole) {
+      this.eventManager.emit("member:update", {
+        type: "role",
+        data: {
+          currentUserId: currentUserId,
+          targetUserId: userId,
+          chatRoomId: chatRoomId,
+          userRole: result.userRole,
+        },
+      });
+    }
+
+    if(result.nickName){
+      this.eventManager.emit("member:update",{
+        type: "nickname",
+        data: {
+          currentUserId: currentUserId,
+          targetUserId: userId,
+        chatRoomId: chatRoomId,
+          nickname: result.nickName,
+        },
+      })
+    }
+    if (result) {
+      return res.json(
+        formatResponse({
+          success: true,
+          message: `Member ${action}d`,
+          data: result.nickName?result.nickName:result.userRole,
+        })
+      );
+    }
+
+    return next("ye");
   };
 
-  addChatAdmin = async (req: Request, res: Response) => {
-    return res.status(500).json(
-      formatResponse({
-        success: false,
-        message: "Internal server error",
-      })
-    );
-  };
+  deleteChat = async (req: Request, res: Response, next: NextFunction) => {
+    const chatRoomId = req.params.chatId as string
+    const currentUserId = req.user.userId as string
 
-  removeChatMember = async (req: Request, res: Response) => {
-    return res.status(500).json(
-      formatResponse({
+    const response = await this.chatServices.clearChat(chatRoomId, currentUserId)
+    if(response){
+      return res.json(formatResponse({
         success: false,
-        message: "Internal server error",
-      })
-    );
-  };
-
-  removeChatAdmin = async (req: Request, res: Response) => {
-    return res.status(500).json(
-      formatResponse({
-        success: false,
-        message: "Internal server error",
-      })
-    );
-  };
+        message: "Chat cleared",
+        data: response
+      }))
+    }
+    return res.status(401).send("No authorized")
+  }
 }

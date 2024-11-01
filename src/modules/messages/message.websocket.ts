@@ -5,6 +5,7 @@ import { inject, injectable } from "inversify";
 import {
   IConnectedUser,
   IConnectionEventHandler,
+  WebsocketHandlerParams,
 } from "../../common/websockets/websocket";
 import { MessageService } from "./message.services";
 import { Attachment, IMessage } from "./message.interface";
@@ -20,10 +21,11 @@ export default class MessageWebSocketHandler
     @inject(TYPES.MediaService) private mediaService: MediaService
   ) {}
 
-  async handle(
-    socket: Socket,
-    connectedUsers: Map<string, IConnectedUser>
-  ): Promise<void> {
+  async handle({
+    connectedUsers,
+    io,
+    socket,
+  }: WebsocketHandlerParams): Promise<void> {
     socket.on("chat:focus", async ({ chatRoomId }: { chatRoomId: string }) => {
       const userId = socket.userId;
       if (!userId || !socket.rooms.has(chatRoomId)) return;
@@ -52,8 +54,6 @@ export default class MessageWebSocketHandler
           });
         }
       }
-
-      // console.log("chat focused",userStatus)
     });
 
     socket.on("chat:unfocus", ({ chatRoomId }: { chatRoomId: string }) => {
@@ -65,14 +65,17 @@ export default class MessageWebSocketHandler
         userStatus.activeChatId = null;
         connectedUsers.set(userId, userStatus);
       }
-
-      // console.log("chat Unfocused",userStatus)
     });
 
     interface NewMessage {
       chatRoomId: string;
-      message: IMessage;
-      attachment: Omit<Attachment, "filePath"> | undefined;
+      message: {
+        messageId: string;
+        sender: IMessage["sender"];
+        content?: string;
+        parentMessage?: IMessage["parentMessage"];
+      };
+      attachment?: Omit<Attachment, "filePath">;
     }
     socket.on(
       "message:send",
@@ -86,7 +89,8 @@ export default class MessageWebSocketHandler
             });
             return;
           }
-          if (!message.content.trim() && !attachment) return;
+
+          if (!message.content?.trim() && !attachment) return;
 
           const chatRoomMembers = await this.messageService.getChatRoomMembers(
             chatRoomId
@@ -115,24 +119,29 @@ export default class MessageWebSocketHandler
             }
           }
 
-          console.log("Creating message");
-          const [_, signedUrl] = await this.messageService.createMessageInChat(
-            chatRoomId,
-            message,
-            status,
-            attachment,
-            notReadBy
-          );
-
-          console.log("message created");
-          // console.log(chatRoomMembers, activeInChatRoom, "From socket")
+          const [[msg, _], signedUrl] =
+            await this.messageService.createMessageInChat(
+              chatRoomId,
+              message,
+              status,
+              attachment,
+              notReadBy
+            );
 
           this.messageService.updateMessageRecipt(chatRoomId, readBy);
 
           socket.to(chatRoomId).emit("messageEvent", {
             event: "message:new",
             data: {
-              message,
+              message: {
+                messageId: message.messageId,
+                createdAt: msg.createdAt,
+                sender: message.sender,
+                ...(message.content && { content: message.content }),
+                ...(message.parentMessage && {
+                  parentMessage: message.parentMessage,
+                }),
+              },
               chatRoomId,
               readBy,
               attachment: attachment
@@ -147,9 +156,8 @@ export default class MessageWebSocketHandler
             readBy: readBy,
             fileUrl: signedUrl,
           });
-          console.log("status sent");
         } catch (error) {
-          console.log("message sending failed", error);
+          console.error("message sending failed", error);
           socket.emit("message:status", {
             messageId: message.messageId,
             status: "failed",
@@ -177,7 +185,7 @@ export default class MessageWebSocketHandler
           !socket.userId ||
           !socket.rooms.has(chatRoomId)
         )
-          return console.log("doesnt includes emoji");
+          return;
         const result = await this.messageService.addReactionToMessage(
           messageId,
           reactionType,
@@ -204,8 +212,3 @@ export default class MessageWebSocketHandler
     // })
   }
 }
-
-const used = process.memoryUsage().heapUsed;
-
-console.log("In KB:", (used / 1024).toFixed(1)); // divide by 1024
-console.log("In MB:", (used / (1024 * 1024)).toFixed(1));

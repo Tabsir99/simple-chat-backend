@@ -69,7 +69,7 @@ export default class AuthService {
 
       return { refreshToken };
     } catch (error) {
-      console.log(error, "FROM AUTH SERVICE HANDLE LOG IN");
+      console.error(error, "FROM AUTH SERVICE HANDLE LOG IN");
       throw new Error("Error handling user login");
     }
   }
@@ -115,7 +115,7 @@ export default class AuthService {
       const refreshToken = await this.handleUserLogin(decoded.payload.email);
       return refreshToken;
     } catch (err) {
-      console.log(err, " FROM AUTH SERVICE EMAIL OGIN");
+      console.error(err, " FROM AUTH SERVICE EMAIL OGIN");
       return {
         refreshToken: null,
       };

@@ -5,6 +5,7 @@ import UserService from "./user.services";
 import {
   IConnectedUser,
   IConnectionEventHandler,
+  WebsocketHandlerParams,
 } from "../../common/websockets/websocket";
 import FriendshipService from "../friendship/frnd.services";
 import { EventManager } from "../../common/config/eventService";
@@ -18,10 +19,11 @@ export default class UserWebSocketHandler implements IConnectionEventHandler {
     @inject(TYPES.EventManager) private eventManager: EventManager
   ) {}
 
-  async handle(
-    socket: Socket,
-    connectedUsers: Map<string, IConnectedUser>
-  ): Promise<void> {
+  async handle({
+    io,
+    socket,
+    connectedUsers,
+  }: WebsocketHandlerParams): Promise<void> {
     const friendsIdList = await this.friendshipService.getFriendIdList(
       socket.userId as string
     );
@@ -33,28 +35,38 @@ export default class UserWebSocketHandler implements IConnectionEventHandler {
         if (connectedUsers.has(friendId)) {
           socket.to(friendSocketId).emit("userEvent", {
             event: "user:status",
-            data: { friendId: socket.userId, status: "online", },
+            data: { friendId: socket.userId, status: "online" },
           });
         }
       });
     }
 
-    // console.log(friendIdList)
 
-    socket.on("activity:reset",async (ev: {type: "friends"|"chats", userId: string}) => {
-      if(ev.type === "friends"){
-        await this.userService.updateRecentActivities(ev.userId, "reset-friends")
+    socket.on(
+      "activity:reset",
+      async (ev: { type: "friends" | "chats"; userId: string }) => {
+        if (ev.type === "friends") {
+          await this.userService.updateRecentActivities(
+            ev.userId,
+            "reset-friends"
+          );
+        }
+        if (ev.type === "chats") {
+          await this.userService.updateRecentActivities(
+            ev.userId,
+            "reset-chats"
+          );
+        }
       }
-      if(ev.type === "chats"){
-        await this.userService.updateRecentActivities(ev.userId, "reset-chats")
-      }
-    })
+    );
   }
 
-  async onDisconnect(userId: string, socket: Socket, connectedUsers: Map<string, IConnectedUser>): Promise<void> {
-    const friendsIdList = await this.friendshipService.getFriendIdList(
-      userId
-    );
+  async onDisconnect(
+    userId: string,
+    socket: Socket,
+    connectedUsers: Map<string, IConnectedUser>
+  ): Promise<void> {
+    const friendsIdList = await this.friendshipService.getFriendIdList(userId);
 
     if (friendsIdList) {
       friendsIdList.forEach((friendId) => {

@@ -89,7 +89,6 @@ export class MediaService {
       // Don't set responseDisposition for streaming
     });
 
-    console.log("URL signed for streaming, path: %s", path);
     return result[0];
   }
 }

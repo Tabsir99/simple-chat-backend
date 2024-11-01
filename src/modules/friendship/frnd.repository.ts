@@ -78,12 +78,22 @@ export default class FriendshipRepository {
           },
         },
       }),
-      prisma.friendship.create({
-        data: {
+      prisma.friendship.upsert({
+        create: {
           userId1: smallerId,
           userId2: LargerId,
           senderId: senderId,
           status: "pending",
+        },
+        update: {
+          status: "pending",
+          senderId: senderId,
+        },
+        where: {
+          userId1_userId2: {
+            userId1: smallerId,
+            userId2: LargerId,
+          },
         },
       }),
     ]);
@@ -92,65 +102,177 @@ export default class FriendshipRepository {
   deleteFriendship = async (userId: string, targetUserId: string) => {
     const [smallerId, largerId] = [userId, targetUserId].sort();
 
-    return prisma.friendship.deleteMany({
-      where: {
-        OR: [
-          {
-            status: "pending",
-            senderId: userId,
-            userId1: smallerId,
-            userId2: largerId,
-          },
-          {
-            status: "blocked",
-            blockedUserId: targetUserId,
-            userId1: smallerId,
-            userId2: largerId,
-          },
-        ],
-      },
-    });
+    const [_, res] = await prisma.$transaction([
+      prisma.chatRoom.updateMany({
+        where: {
+          isGroup: false,
+          OR: [
+            {
+              ChatRoomMember: {
+                some: { userId: smallerId },
+              },
+            },
+            {
+              ChatRoomMember: {
+                some: { userId: largerId },
+              },
+            },
+          ],
+        },
+        data: {
+          blockedUserId: null,
+        },
+      }),
+      prisma.friendship.updateMany({
+        where: {
+          OR: [
+            {
+              status: "pending",
+              senderId: userId,
+              userId1: smallerId,
+              userId2: largerId,
+            },
+            {
+              status: "blocked",
+              blockedUserId: targetUserId,
+              userId1: smallerId,
+              userId2: largerId,
+            },
+          ],
+        },
+        data: {
+          status: "canceled",
+          blockedUserId: null,
+        },
+      }),
+    ]);
+    return res;
   };
 
   async acceptFriendship(
     userId: string,
     friendId: string
-  ): Promise<{ status: string, chatRoomId: string }> {
+  ): Promise<{ status: string; chatRoomId: string }> {
     const [smallerId, largerId] = [userId, friendId].sort();
 
     return prisma.$transaction(async (tx) => {
+      const chatRoomId = await this.findOrCreateChatRoom(
+        tx,
+        smallerId,
+        largerId
+      );
+
       const updatedFriendship = await tx.friendship.update({
         where: {
           userId1_userId2: { userId1: smallerId, userId2: largerId },
           status: "pending",
           senderId: friendId,
         },
-        data: { status: "accepted" },
+        data: { status: "accepted", chatRoomId: chatRoomId.chatRoomId },
         select: { status: true },
       });
 
-      const chatRoomId = await this.findOrCreateChatRoom(tx, smallerId, largerId);
-
-      return {status: updatedFriendship.status, chatRoomId: chatRoomId.chatRoomId};
+      return {
+        status: updatedFriendship.status,
+        chatRoomId: chatRoomId.chatRoomId,
+      };
     });
   }
 
   async blockFriendship(
     userId: string,
     friendId: string
-  ): Promise<{ status: string }> {
+  ): Promise<{ status: string; chatRoomId: string | null }> {
     const [smallerId, largerId] = [userId, friendId].sort();
-    return prisma.friendship.update({
+
+    const res = await prisma.friendship.findUnique({
       where: {
-        userId1_userId2: { userId1: smallerId, userId2: largerId },
-        OR: [{ status: "pending", senderId: friendId }, { status: "accepted" }],
+        userId1_userId2: {
+          userId1: smallerId,
+          userId2: largerId,
+        },
+        status: { not: "blocked" },
       },
-      data: {
-        status: "blocked",
-        blockedUserId: friendId,
+      select: {
+        status: true,
+        blockedUserId: true,
+        chatRoomId: true,
       },
-      select: { status: true },
     });
+
+    if (!res || res.blockedUserId === userId) {
+      throw new Error("Blocked user can not perform block action");
+    }
+    if (res?.status === "pending") {
+      const status = await prisma.friendship.update({
+        where: {
+          userId1_userId2: { userId1: smallerId, userId2: largerId },
+        },
+        data: {
+          status: "blocked",
+          blockedUserId: friendId,
+        },
+        select: { status: true },
+      });
+
+      if (res.chatRoomId) {
+       await prisma.chatRoom.updateMany({
+          where: {
+            isGroup: false,
+            OR: [
+              {
+                ChatRoomMember: {
+                  some: { userId: smallerId },
+                },
+              },
+              {
+                ChatRoomMember: {
+                  some: { userId: largerId },
+                },
+              },
+            ],
+          },
+          data: {
+            blockedUserId: friendId,
+          },
+        });
+      }
+      return { status: status.status, chatRoomId: res.chatRoomId };
+    }
+
+    const [status] = await prisma.$transaction([
+      prisma.friendship.update({
+        where: {
+          userId1_userId2: { userId1: smallerId, userId2: largerId },
+        },
+        data: {
+          status: "blocked",
+          blockedUserId: friendId,
+        },
+        select: { status: true },
+      }),
+      prisma.chatRoom.updateMany({
+        where: {
+          isGroup: false,
+          OR: [
+            {
+              ChatRoomMember: {
+                some: { userId: smallerId },
+              },
+            },
+            {
+              ChatRoomMember: {
+                some: { userId: largerId },
+              },
+            },
+          ],
+        },
+        data: {
+          blockedUserId: friendId,
+        },
+      }),
+    ]);
+    return { status: status.status, chatRoomId: res.chatRoomId };
   }
 
   private async findOrCreateChatRoom(
@@ -184,7 +306,6 @@ export default class FriendshipRepository {
             { userId: userId2, userRole: "member" },
           ],
         },
-
       },
       select: { chatRoomId: true },
     });

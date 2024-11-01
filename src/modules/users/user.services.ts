@@ -77,7 +77,7 @@ export default class UserService implements IUserService {
 
       return userInfo;
     } catch (error) {
-      console.log(error, " FROM USER SERVICE GETUSERINFO");
+      console.error(error, " FROM USER SERVICE GETUSERINFO");
       return null;
     }
   };
@@ -90,7 +90,7 @@ export default class UserService implements IUserService {
       const result = await this.userRepository.searchUsername(query, userId);
       return result;
     } catch (error) {
-      console.log(error, " FROM USERSERVICE QUERY BY NAME");
+      console.error(error, " FROM USERSERVICE QUERY BY NAME");
       return null;
     }
   };
@@ -137,7 +137,7 @@ export default class UserService implements IUserService {
       }
       return true
     } catch (error: any) {
-      console.log(error.message)
+      console.error(error.message)
       return false
     }
   }

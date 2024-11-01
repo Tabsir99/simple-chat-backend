@@ -39,7 +39,7 @@ export class EmailService implements IEmailService {
       // Sending the email
       const result = await this.transporter.sendMail(mailOptions);
       
-      console.log('Verification email sent:', result);
+      console.info('Verification email sent:', result);
     } catch (error) {
       console.error('Error sending verification email:', error);
     }

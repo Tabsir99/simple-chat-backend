@@ -15,8 +15,8 @@ export interface Attachment {
   filePath: string;
   fileName: string;
   fileSize: number;
-  fileType: $Enums.FileType | string
-  messageId?: string
+  fileType: $Enums.FileType | string;
+  messageId?: string;
 }
 
 interface ParentMessage {
@@ -54,3 +54,9 @@ type Message = {
   status: $Enums.MessageStatus;
   type: $Enums.MessageType;
 };
+
+export interface FilterMessageOption {
+  joinedAt: Date;
+  removedAt: Date | null;
+  chatClearedAt: Date | null;
+}

@@ -14,6 +14,8 @@ import container from "./inversify/bindings";
 import { TYPES } from "./inversify/types";
 import messageRouter from "./modules/messages/message.routes";
 import mediaRouter from "./modules/media/media.route";
+import EventEmitter from "events";
+
 
 process.env.TZ = "UTC"
 const app = express();
@@ -37,6 +39,11 @@ app.use(
 );
 app.use(cookieParser());
 
+
+// app.use(async (_,__,next) => {
+//   await new Promise(res => setTimeout(res,2500))
+//   next()
+// })
 
 app.use("/api",authRoute)
 app.use("/api", messageRouter);
@@ -62,8 +69,7 @@ app.all("*", (req, res) => {
 });
 
 app.use((err: Error, _: Request, res: Response) => {
-  console.error(err.stack); // Log error details (stack trace)
-  console.log("From error middleware")
+  console.error(err.stack, "From Error middleware"); // Log error details (stack trace)
   
   res.status(500).json({
     success: false,
@@ -74,9 +80,20 @@ app.use((err: Error, _: Request, res: Response) => {
 
 const PORT = 3001;
 httpServer.listen(PORT, () => {
-  console.log("Server started at port:", PORT, process.env.TZ);
+  console.info("Server started at port:", PORT, process.env.TZ);
 });
 
 // Web socket server initializing
 // const webSocketManager = container.get<WebSocketManager>(TYPES.WebSocketManager)
 // webSocketManager.initialize(httpServer)
+
+
+const eventManager = container.get(TYPES.EventManager) as any
+const used = process.memoryUsage().heapUsed;
+
+console.log("In KB:", (used / 1024).toFixed(1)); // divide by 1024
+console.log("In MB:", (used / (1024 * 1024)).toFixed(1));
+console.log("Listener count", eventManager.totalListenersCount())
+
+
+// setInterval(() => console.clear(), 60000)

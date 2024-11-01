@@ -1,21 +1,32 @@
 // src/common/websockets/websocket.ts
 /// <reference path="../../global.d.ts" />
-import { Socket, Server as SocketServer } from "socket.io";
+import { DefaultEventsMap, Socket, Server as SocketServer } from "socket.io";
 import { Server as HttpServer } from "http";
 import { inject, injectable } from "inversify";
 import { jwtVerify } from "jose";
 import config from "../config/env";
 import { TYPES } from "../../inversify/types";
 import { EventManager } from "../config/eventService";
+import { Server } from "socket.io";
 
 export interface IConnectedUser {
   userId: string | undefined;
   socketId: string;
-  activeChatId: string | null
+  activeChatId: string | null;
+}
+
+export interface WebsocketHandlerParams {
+  io: Server<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any> | null;
+  socket: Socket;
+  connectedUsers: Map<string, IConnectedUser>;
 }
 
 export interface IWebSocketHandler {
-  handle(socket: Socket, connectedUsers: Map<string, IConnectedUser>): Promise<void>;
+  handle(
+    {io,
+    socket,
+    connectedUsers}: WebsocketHandlerParams
+  ): Promise<void>;
 }
 
 // New interface for connection event handlers
@@ -63,7 +74,7 @@ export class WebSocketManager {
     });
     this.setupMiddleware();
     this.setupHandlers();
-    this.setUpNodeListeners()
+    this.setUpNodeListeners();
   }
 
   private setupMiddleware(): void {
@@ -84,7 +95,9 @@ export class WebSocketManager {
         const userId = payload.payload.userId as string;
         socket.userId = userId;
       } catch (error) {
-        console.log(error instanceof Error && `${error.message} from websocket`);
+        console.error(
+          error instanceof Error && `${error.message} from websocket`
+        );
         return next(new Error("Token verification failed"));
       }
 
@@ -109,14 +122,13 @@ export class WebSocketManager {
 
       // Set up handlers
       this.connectionEventHandlers.forEach((handler) => {
-        handler.handle(socket, this.connectedUsers);
+        handler.handle({io: this.io, socket, connectedUsers: this.connectedUsers});
       });
 
       socket.on("disconnect", () => {
-        // console.log("User disconnected, UserID:", userId);
         this.removeUser(userId);
-        socket.rooms.clear()
-        // Notify handlers of disconnection
+        socket.rooms.clear();
+
         this.connectionEventHandlers.forEach((handler) => {
           if (handler.onDisconnect) {
             handler.onDisconnect(userId, socket, this.connectedUsers);
@@ -135,18 +147,69 @@ export class WebSocketManager {
   }
 
   private setUpNodeListeners = () => {
-    const io = this.io
-    if(!io) return
-    this.eventManager.on<{chatRoomId: string, users: {username: string, userId: string}[]}>("chatRoom:create",(data) => {
-      data?.users.forEach(user => {
-        const connectedUser = this.connectedUsers.get(user.userId)
-        console.log(connectedUser)
-        if(connectedUser){
-          this.io?.in(connectedUser.socketId).socketsJoin(data.chatRoomId)
+    const io = this.io;
+    if (!io) return;
+    this.eventManager.on<{
+      chatRoomId: string;
+      users: { username: string; userId: string }[];
+    }>("chatRoom:create", (data) => {
+      data?.users.forEach((user) => {
+        const connectedUser = this.connectedUsers.get(user.userId);
+        if (connectedUser) {
+          io.in(connectedUser.socketId).socketsJoin(data.chatRoomId);
         }
-      })
-    })
-  }
+      });
+    });
+
+    type MemberUpdatePayload =
+      | {
+          type: "role";
+          data: {
+            targetUserId: string;
+            chatRoomId: string;
+            userRole: "admin" | "member";
+            currentUserId: string;
+          };
+        }
+      | {
+          type: "nickname";
+          data: {
+            chatRoomId: string;
+            targetUserId: string;
+            currentUserId: string;
+            nickname: string;
+          };
+        };
+    this.eventManager.on<MemberUpdatePayload>("member:update", (payload) => {
+      const connectedUser = this.connectedUsers.get(payload.data.currentUserId);
+
+      if (payload.type === "role") {
+        io.to(payload.data.chatRoomId)
+          .except(connectedUser?.socketId || "")
+          .emit("chatEvent", {
+            event: "role:update",
+            data: {
+              userId: payload.data.targetUserId,
+              chatRoomId: payload.data.chatRoomId,
+              userRole: payload.data.userRole,
+            },
+          });
+      }
+
+      if (payload.type === "nickname") {
+        io.to(payload.data.chatRoomId)
+          .except(connectedUser?.socketId || "")
+          .emit("chatEvent", {
+            event: "nickname:update",
+            data: {
+              userId: payload.data.targetUserId,
+              chatRoomId: payload.data.chatRoomId,
+              nickname: payload.data.nickname,
+            },
+          });
+      }
+    });
+  };
   sendMessage({
     event,
     message,
@@ -154,25 +217,24 @@ export class WebSocketManager {
   }: {
     event: string;
     message: {
-      event: string,
-      data: any
+      event: string;
+      data: any;
     };
     users: string | string[];
   }) {
-    const io = this.io
+    const io = this.io;
     if (!io) {
       console.error("Socket server not initialized");
       return;
     }
-    
+
     if (typeof users === "string") {
       const targetUser = this.connectedUsers.get(users);
       if (targetUser) {
         io.to(targetUser.socketId).emit(event, message);
       }
-    } 
-    else {
-      users.forEach(user => {
+    } else {
+      users.forEach((user) => {
         const targetUser = this.connectedUsers.get(user);
         if (targetUser) {
           io.to(targetUser.socketId).emit(event, message);

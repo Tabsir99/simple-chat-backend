@@ -2,7 +2,7 @@
 CREATE TYPE "UserStatus" AS ENUM ('offline', 'online', 'away');
 
 -- CreateEnum
-CREATE TYPE "FriendshipStatus" AS ENUM ('pending', 'accepted', 'blocked');
+CREATE TYPE "FriendshipStatus" AS ENUM ('pending', 'accepted', 'blocked', 'canceled');
 
 -- CreateEnum
 CREATE TYPE "ChatRole" AS ENUM ('member', 'admin');
@@ -41,6 +41,7 @@ CREATE TABLE "ChatRoom" (
     "lastMessageId" UUID,
     "createdBy" UUID,
     "roomImage" TEXT,
+    "blockedUserId" UUID,
 
     CONSTRAINT "ChatRoom_pkey" PRIMARY KEY ("chatRoomId")
 );
@@ -93,6 +94,7 @@ CREATE TABLE "Friendship" (
     "senderId" UUID NOT NULL,
     "blockedUserId" UUID,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "chatRoomId" UUID,
 
     CONSTRAINT "Friendship_pkey" PRIMARY KEY ("friendshipId")
 );
@@ -105,6 +107,8 @@ CREATE TABLE "ChatRoomMember" (
     "joinedAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "unreadCount" INTEGER NOT NULL DEFAULT 0,
     "nickName" VARCHAR(50),
+    "removedAt" TIMESTAMP(3),
+    "chatClearedAt" TIMESTAMP(3),
 
     CONSTRAINT "ChatRoomMember_pkey" PRIMARY KEY ("chatRoomId","userId")
 );
@@ -240,6 +244,9 @@ ALTER TABLE "Friendship" ADD CONSTRAINT "Friendship_senderId_fkey" FOREIGN KEY (
 
 -- AddForeignKey
 ALTER TABLE "Friendship" ADD CONSTRAINT "Friendship_blockedUserId_fkey" FOREIGN KEY ("blockedUserId") REFERENCES "User"("userId") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Friendship" ADD CONSTRAINT "Friendship_chatRoomId_fkey" FOREIGN KEY ("chatRoomId") REFERENCES "ChatRoom"("chatRoomId") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ChatRoomMember" ADD CONSTRAINT "ChatRoomMember_chatRoomId_fkey" FOREIGN KEY ("chatRoomId") REFERENCES "ChatRoom"("chatRoomId") ON DELETE CASCADE ON UPDATE CASCADE;

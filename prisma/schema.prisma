@@ -23,6 +23,7 @@ enum FriendshipStatus {
   pending
   accepted
   blocked
+  canceled
 }
 
 enum ChatRole {
@@ -115,6 +116,7 @@ model ChatRoom {
   lastMessageId String?  @db.Uuid
   createdBy     String?  @db.Uuid
   roomImage     String?
+  blockedUserId String?  @db.Uuid
 
   Messages       Message[] // One-to-many relationship with messages
   ChatRoomMember ChatRoomMember[]
@@ -122,6 +124,7 @@ model ChatRoom {
   lastMessage Message?     @relation("LastMessage", fields: [lastMessageId], references: [messageId])
   creator     User?        @relation(fields: [createdBy], references: [userId])
   Attachment  Attachment[]
+  Friendship  Friendship[]
 
   @@index([lastActivity])
 }
@@ -190,12 +193,14 @@ model Friendship {
   senderId      String           @db.Uuid
   blockedUserId String?          @db.Uuid
   createdAt     DateTime         @default(now())
+  chatRoomId    String?          @db.Uuid
 
   // Relations
-  user1       User  @relation("User1Friendships", fields: [userId1], references: [userId])
-  user2       User  @relation("User2Friendships", fields: [userId2], references: [userId])
-  sender      User  @relation("senderFriendships", fields: [senderId], references: [userId])
-  blockedUser User? @relation("blockedUserFriendships", fields: [blockedUserId], references: [userId])
+  user1       User      @relation("User1Friendships", fields: [userId1], references: [userId])
+  user2       User      @relation("User2Friendships", fields: [userId2], references: [userId])
+  sender      User      @relation("senderFriendships", fields: [senderId], references: [userId])
+  blockedUser User?     @relation("blockedUserFriendships", fields: [blockedUserId], references: [userId])
+  chatRoom    ChatRoom? @relation(fields: [chatRoomId], references: [chatRoomId])
 
   @@unique([userId1, userId2])
 }
@@ -207,6 +212,8 @@ model ChatRoomMember {
   joinedAt       DateTime         @default(now()) @db.Timestamp(6)
   unreadCount    Int              @default(0)
   nickName       String?          @db.VarChar(50)
+  removedAt      DateTime?
+  chatClearedAt  DateTime?
   // Relations
   chatRoom       ChatRoom         @relation(fields: [chatRoomId], references: [chatRoomId], onDelete: Cascade)
   user           User             @relation(fields: [userId], references: [userId], onDelete: Cascade)
