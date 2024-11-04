@@ -50,9 +50,8 @@ export default class UserControllers {
   };
 
   queryUsersProfile = async (req: Request, res: Response) => {
-    await new Promise((res) => setTimeout(res, 2000));
 
-    const query = req.query?.query as string;
+    const query = req.query as {query: string, chatRoomId?: string};
     const userId = req.user.userId as string
 
     const results = await this.userService.queryByUsername(query, userId);

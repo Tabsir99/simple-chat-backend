@@ -2,7 +2,7 @@ import { $Enums } from "@prisma/client";
 
 export const generateUsernameFromEmail = (email: string): string => {
   const [username] = email.split("@");
-  return username;
+  return username.charAt(0).toUpperCase() + username.slice(1).toLowerCase();
 };
 
 export async function getGoogleJWKs() {

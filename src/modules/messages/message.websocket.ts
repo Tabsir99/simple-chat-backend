@@ -145,7 +145,7 @@ export default class MessageWebSocketHandler
               chatRoomId,
               readBy,
               attachment: attachment
-                ? { ...attachment, fileUrl: signedUrl }
+                ? { ...attachment }
                 : undefined,
             },
           });

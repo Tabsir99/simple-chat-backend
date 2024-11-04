@@ -26,7 +26,9 @@ export default class ChatServices {
             unreadCount: room.removedAt || isChatCleared ? 0 : room.unreadCount,
             lastActivity: room.removedAt ? room.removedAt : room.lastActivity,
             messageContent: isChatCleared ? null : room.messageContent,
-            fileType: isChatCleared ? null : getMimeType(room.fileType as FileType),
+            fileType: isChatCleared
+              ? null
+              : getMimeType(room.fileType as FileType),
           };
         })
         .sort(
@@ -107,29 +109,41 @@ export default class ChatServices {
     chatRoomId: string,
     userId: string,
     action: "promote" | "demote" | "nickname",
+    currentUserId: string,
+    username: string,
     nickname?: string
   ) => {
-    let res: { nickName: string | null; userRole: ChatRole | null } = {
-      nickName: null,
-      userRole: null,
-    };
+    let res: { messageId: string, content: string, createdAt: Date}
+
+    const currentUser = await this.verifyUserPermission(
+      currentUserId,
+      chatRoomId
+    );
+
     if (action === "nickname") {
-      res.nickName = (
+      res = (
         await this.chatRepository.updateGroupMember(
           chatRoomId,
           userId,
-          nickname as string
+          currentUserId === userId?"his":`${username}'s`,
+          nickname as string,
+          currentUser.username
         )
-      ).nickName;
+      );
       return res;
     }
-    res.userRole = (
+
+    if (!currentUser.isAdmin) throw new Error("Not enough permission");
+
+    res = (
       await this.chatRepository.updateGroupMemberRole(
         chatRoomId,
         userId,
-        action === "demote" ? "member" : "admin"
+        action === "demote" ? "member" : "admin",
+        username,
+        currentUser.username
       )
-    ).userRole;
+    );
 
     return res;
   };
@@ -137,17 +151,25 @@ export default class ChatServices {
   updateGroupMembership = async (
     chatRoomId: string,
     userId: string,
-    currentUserId: string
+    currentUserId: string,
+    username: string
   ) => {
     try {
+      const currentUser = await this.verifyUserPermission(
+        currentUserId,
+        chatRoomId
+      );
+      if (!currentUser.isAdmin) {
+        throw new Error("Not enough permission");
+      }
       const res = await this.chatRepository.deleteGroupMember(
         chatRoomId,
         userId,
-        currentUserId
+        currentUserId,
+        username,
+        currentUser.username
       );
-      if (!res) {
-        throw new Error("Not enough permission");
-      }
+
       return res;
     } catch (error) {
       return false;
@@ -168,4 +190,29 @@ export default class ChatServices {
       return false;
     }
   };
+
+  addMember = async (
+    data: { chatRoomId: string; users: {userId: string, username: string}[] },
+    currentUserId: string
+  ) => {
+    const currentUser = await this.verifyUserPermission(currentUserId,data.chatRoomId)
+    const res = await this.chatRepository.addGroupMember(data,currentUser.username);
+    return res;
+  };
+
+  verifyUserPermission = async (userId: string, chatRoomId: string) => {
+    const res = await this.chatRepository.findUserPermission(
+      userId,
+      chatRoomId
+    );
+    if (!res) throw new Error("ChatRoomMember does not exists");
+
+    if (res.removedAt) throw new Error("User is no longer in the chatroom");
+
+    return {
+      isAdmin: res.userRole === "admin" ? true : false,
+      username: res.user.username,
+    };
+  };
 }
+ 

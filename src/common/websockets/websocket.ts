@@ -8,6 +8,7 @@ import config from "../config/env";
 import { TYPES } from "../../inversify/types";
 import { EventManager } from "../config/eventService";
 import { Server } from "socket.io";
+import { MinifiedMessage } from "../../modules/messages/message.interface";
 
 export interface IConnectedUser {
   userId: string | undefined;
@@ -22,11 +23,7 @@ export interface WebsocketHandlerParams {
 }
 
 export interface IWebSocketHandler {
-  handle(
-    {io,
-    socket,
-    connectedUsers}: WebsocketHandlerParams
-  ): Promise<void>;
+  handle({ io, socket, connectedUsers }: WebsocketHandlerParams): Promise<void>;
 }
 
 // New interface for connection event handlers
@@ -122,7 +119,11 @@ export class WebSocketManager {
 
       // Set up handlers
       this.connectionEventHandlers.forEach((handler) => {
-        handler.handle({io: this.io, socket, connectedUsers: this.connectedUsers});
+        handler.handle({
+          io: this.io,
+          socket,
+          connectedUsers: this.connectedUsers,
+        });
       });
 
       socket.on("disconnect", () => {
@@ -161,6 +162,63 @@ export class WebSocketManager {
       });
     });
 
+    this.eventManager.on<{
+      chatRoomId: string;
+      currentUserId: string;
+      message: MinifiedMessage;
+    }>("message:new", ({ chatRoomId, currentUserId, message }) => {
+      io.to(chatRoomId)
+        .except(this.connectedUsers.get(currentUserId)?.socketId || "")
+        .emit("messageEvent", {
+          event: "message:new",
+          data: {
+            chatRoomId,
+            message: {
+              ...message,
+              type: "system",
+            },
+          },
+        });
+    });
+
+    this.eventManager.on<{
+      chatRoomId: string;
+      userId: string;
+      currentUserId: string;
+    }>("member:remove", async ({ chatRoomId, userId, currentUserId }) => {
+      io.to(chatRoomId)
+        .except(this.connectedUsers.get(currentUserId)?.socketId || "")
+        .emit("chatEvent", {
+          event: "member:remove",
+          data: { chatRoomId: chatRoomId, userId: userId },
+        });
+        
+      io.in(this.connectedUsers.get(userId)?.socketId || "").socketsLeave(
+        chatRoomId
+      );
+    });
+
+    this.eventManager.on<{
+      chatRoomId: string;
+      users: string[];
+      currentUserId: string;
+    }>("member:add", async (ev) => {
+      for (let index = 0; index < ev.users.length; index++) {
+        const connectedUser = this.connectedUsers.get(ev.users[index]);
+        if (connectedUser) {
+          io.in(connectedUser.socketId).socketsJoin(ev.chatRoomId);
+        }
+      }
+      io.to(ev.chatRoomId)
+        .except(this.connectedUsers.get(ev.currentUserId)?.socketId || "")
+        .emit("chatEvent", {
+          event: "member:add",
+          data: {
+            chatRoomId: ev.chatRoomId,
+            users: ev.users,
+          },
+        });
+    });
     type MemberUpdatePayload =
       | {
           type: "role";
@@ -220,7 +278,7 @@ export class WebSocketManager {
       event: string;
       data: any;
     };
-    users: string | string[];
+    users: string;
   }) {
     const io = this.io;
     if (!io) {
@@ -233,13 +291,6 @@ export class WebSocketManager {
       if (targetUser) {
         io.to(targetUser.socketId).emit(event, message);
       }
-    } else {
-      users.forEach((user) => {
-        const targetUser = this.connectedUsers.get(user);
-        if (targetUser) {
-          io.to(targetUser.socketId).emit(event, message);
-        }
-      });
     }
   }
 

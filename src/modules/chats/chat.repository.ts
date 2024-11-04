@@ -2,6 +2,7 @@ import { injectable } from "inversify";
 import prisma from "../../common/config/db";
 import { randomUUID } from "crypto";
 import { ChatRoomHead } from "./chats.interfaces";
+import { Prisma } from "@prisma/client";
 
 @injectable()
 export default class ChatRepository {
@@ -197,22 +198,27 @@ export default class ChatRepository {
   };
 
   getChatRoomListByUserId = async (userId: string) => {
-    const res = await prisma.$queryRaw<{ chatRoomId: string }[]>`
-    SELECT cr."chatRoomId"
-    FROM "ChatRoomMember" crm
-    JOIN "ChatRoom" cr ON crm."chatRoomId" = cr."chatRoomId"
-    WHERE crm."userId" = ${userId}::uuid
-    AND (crm."removedAt" IS NULL OR crm."joinedAt" > crm."removedAt")
-    `;
+    const res = await prisma.chatRoomMember.findMany({
+      where: {
+        userId: userId,
+        removedAt: null,
+      },
+      select: {
+        chatRoomId: true
+      }
+    })
     return res;
   };
 
   updateGroupMemberRole = async (
     chatRoomId: string,
     userId: string,
-    userRole: "admin" | "member"
+    userRole: "admin" | "member",
+    username: string,
+    currentUsername: string
   ) => {
-    return await prisma.chatRoomMember.update({
+    const uuid = randomUUID();
+    const res = await prisma.chatRoomMember.update({
       where: {
         chatRoomId_userId: {
           chatRoomId: chatRoomId,
@@ -224,19 +230,45 @@ export default class ChatRepository {
       },
       data: {
         userRole: userRole,
+        chatRoom: {
+          update: {
+            Messages: {
+              create: {
+                content: `${currentUsername} has ${
+                  userRole === "admin" ? "promoted" : "removed"
+                } ${username} ${
+                  userRole === "admin" ? "to admin" : "from admin role"
+                } `,
+                messageId: uuid,
+                type: "system",
+                status: "delivered",
+              },
+            },
+          },
+        },
       },
       select: {
         userRole: true,
       },
     });
+    return {
+      messageId: uuid,
+      content: `${currentUsername} has ${
+        userRole === "admin" ? "promoted" : "removed"
+      } ${username} ${userRole === "admin" ? "to admin" : "from admin role"} `,
+      createdAt: new Date(),
+    };
   };
 
   updateGroupMember = async (
     chatRoomId: string,
     userId: string,
-    nickname: string
+    username: string,
+    nickname: string,
+    currentUserName: string
   ) => {
-    return await prisma.chatRoomMember.update({
+    const uuid = randomUUID();
+    await prisma.chatRoomMember.update({
       where: {
         chatRoomId_userId: {
           chatRoomId: chatRoomId,
@@ -245,11 +277,29 @@ export default class ChatRepository {
       },
       data: {
         nickName: nickname,
+        chatRoom: {
+          update: {
+            Messages: {
+              create: {
+                content: `${currentUserName} changed ${username} nickname to '${nickname}'`,
+                messageId: uuid,
+                type: "system",
+                status: "delivered",
+              },
+            },
+          },
+        },
       },
       select: {
         nickName: true,
       },
     });
+
+    return {
+      messageId: uuid,
+      content: `${currentUserName} changed ${username} nickname to '${nickname}'`,
+      createdAt: new Date(),
+    };
   };
 
   findChatRoom = async (userId: string, chatRoomId: string) => {
@@ -271,33 +321,14 @@ export default class ChatRepository {
   deleteGroupMember = async (
     chatRoomId: string,
     userId: string,
-    currentUserId: string
+    currentUserId: string,
+    username: string,
+    currentUsername: string
   ) => {
     const result = await prisma.$transaction(async (tx) => {
-     const res = await prisma.chatRoomMember.findMany({
-        where: {
-          chatRoomId: chatRoomId,
-          OR: [{ userId: userId }, { userId: currentUserId }],
-        },
-        select: {
-          userRole: true,
-          user: {
-            select: { username: true, userId: true },
-          },
-        },
-        take: 2,
-  
-      });
-
-      const sortedRes = res.sort((a, b) => 
-        a.user.userId === currentUserId ? -1 : 1
-      );
-      if (sortedRes[0]?.userRole !== "admin") {
-        return false;
-      }
-     const message = await prisma.message.create({
+      const message = await tx.message.create({
         data: {
-          content: `${sortedRes[0].user.username} removed ${sortedRes[1].user.username} from the group.`,
+          content: `${currentUsername} removed ${username} from the group.`,
           type: "system",
           chatRoomId: chatRoomId,
         },
@@ -305,24 +336,23 @@ export default class ChatRepository {
           content: true,
           createdAt: true,
           messageId: true,
-        }
+        },
       });
-      await prisma.chatRoomMember.update({
+      await tx.chatRoomMember.update({
         where: {
           chatRoomId_userId: {
             chatRoomId: chatRoomId,
             userId: userId,
           },
-          removedAt: null,
         },
         data: {
           removedAt: new Date(),
         },
       });
 
-      return message
-    })
-    return result
+      return message;
+    });
+    return result;
   };
 
   clearChat = async (chatRoomId: string, userId: string) => {
@@ -339,6 +369,76 @@ export default class ChatRepository {
       },
       select: {
         chatClearedAt: true,
+      },
+    });
+  };
+
+  addGroupMember = async (
+    data: { chatRoomId: string; users: { userId: string; username: string }[] },
+    currentUsername: string
+  ) => {
+    let messageContent = "";
+    if (data.users.length === 1) {
+      messageContent = `${currentUsername} added ${data.users[0].username} to the group`;
+    } else if (data.users.length === 2) {
+      messageContent = `${currentUsername} added ${data.users[0].username} and ${data.users[1].username} to the group`;
+    } else {
+      messageContent = `${currentUsername} added ${data.users[0].username}, ${
+        data.users[1].username
+      } and ${data.users.length - 2} other person${
+        data.users.length - 2 > 1 ? "s" : ""
+      } to the group`;
+    }
+
+    const values = data.users.map(
+      (user) => Prisma.sql`(${data.chatRoomId}::uuid, ${user.userId}::uuid)`
+    );
+
+    const uuid = randomUUID()
+    const res = await prisma.$executeRaw`
+    WITH inserted_members AS (
+      INSERT INTO "ChatRoomMember" ("chatRoomId", "userId")
+      VALUES ${Prisma.join(values)}
+      ON CONFLICT ("chatRoomId", "userId") 
+      DO UPDATE SET
+        "joinedAt" = CURRENT_TIMESTAMP(3),
+        "removedAt" = NULL,
+        "unreadCount" = 0,
+        "userRole" = 'member'
+      RETURNING "userId"
+    ),
+    inserted_message AS (
+      INSERT INTO "Message" ("messageId", "chatRoomId", "content", "type")
+      VALUES (
+        ${uuid}::uuid, 
+        ${data.chatRoomId}::uuid,
+        ${messageContent},
+        'system'
+      )
+      RETURNING "messageId"
+    )
+    UPDATE "ChatRoom"
+    SET "lastMessageId" = (SELECT "messageId" FROM inserted_message)
+    WHERE "chatRoomId" = ${data.chatRoomId}::uuid
+  `;
+
+    return {messageId: uuid, content: messageContent, createdAt: new Date()};
+  };
+
+  findUserPermission = async (userId: string, chatRoomId: string) => {
+    return await prisma.chatRoomMember.findFirst({
+      where: {
+        chatRoomId: chatRoomId,
+        userId: userId,
+      },
+      select: {
+        userRole: true,
+        joinedAt: true,
+        chatClearedAt: true,
+        removedAt: true,
+        user: {
+          select: { username: true },
+        },
       },
     });
   };

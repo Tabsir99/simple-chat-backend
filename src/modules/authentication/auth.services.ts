@@ -49,7 +49,6 @@ export default class AuthService {
   }
   private async handleUserLogin(
     email: string,
-    username?: string
   ): Promise<{ refreshToken: string }> {
     try {
       let userID = await this.userService.getUserId(email);
@@ -57,7 +56,7 @@ export default class AuthService {
       if (!userID) {
         userID = await this.userService.createUser(
           email,
-          username || this.userService.generateUsernameFromEmail(email)
+          this.userService.generateUsernameFromEmail(email)
         );
       }
 
@@ -209,7 +208,7 @@ export default class AuthService {
       }
 
       const newAccessToken = await this.generateAccessToken(
-        { userId: oldToken.userId },
+        { userId: oldToken.userId},
         "30m",
         this.configService.get("jwtSecretAccess")
       );

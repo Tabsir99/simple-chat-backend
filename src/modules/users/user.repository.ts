@@ -1,4 +1,9 @@
-import { IUserRepository, MiniUserProfile, RawUserData, RecentActivities } from "./user.service.interface";
+import {
+  IUserRepository,
+  MiniUserProfile,
+  RawUserData,
+  RecentActivities,
+} from "./user.service.interface";
 import prisma from "../../common/config/db";
 import { injectable } from "inversify";
 
@@ -26,24 +31,27 @@ export class UserRepository implements IUserRepository {
         const userId = await tx.user.create({
           data: { email, username },
           select: { userId: true },
-        })
+        });
         await tx.recentActivity.create({
           data: {
             totalNewFriendRequests: 0,
             totalNewUnseenChats: 0,
             unseenAcceptedFriendRequests: 0,
             userId: userId.userId,
-            lastUpdated: new Date()
-          }
-        })
+            lastUpdated: new Date(),
+          },
+        });
 
-        return userId
-      })
+        return userId;
+      });
     } catch (error) {
       throw new Error("Database error while creating user.");
     }
   }
-  async getUserInfo(userId: string, query?: object): Promise<Partial<RawUserData> | null> {
+  async getUserInfo(
+    userId: string,
+    query?: object
+  ): Promise<Partial<RawUserData> | null> {
     const baseSelect = {
       username: true,
       email: true,
@@ -62,12 +70,14 @@ export class UserRepository implements IUserRepository {
         },
       },
     };
-  
-    const select = query && Object.keys(query).length > 0 ? Object.fromEntries(
-      Object.entries(query).map(([key, value]) => [key, value === 'true'])
-    ) : baseSelect;
-  
-     
+
+    const select =
+      query && Object.keys(query).length > 0
+        ? Object.fromEntries(
+            Object.entries(query).map(([key, value]) => [key, value === "true"])
+          )
+        : baseSelect;
+
     return prisma.user.findUnique({
       where: { userId: userId },
       select: select,
@@ -78,43 +88,86 @@ export class UserRepository implements IUserRepository {
     query: string,
     userId: string
   ): Promise<Array<MiniUserProfile>> => {
-    return prisma.$queryRaw`SELECT "userId", "username", "profilePicture", "bio" FROM "User" WHERE similarity("username", ${query}) > 0.2 AND "userId" != ${userId}::uuid LIMIT 10`;
+    return prisma.$queryRaw`
+    SELECT "userId", "username", "profilePicture", "bio"
+    FROM "User"
+    WHERE similarity("username", ${query}) > 0.2
+    AND "userId" != ${userId}::uuid
+    LIMIT 10`;
   };
 
-  updateUserStatus = async (userId: string, status: "online"|"offline") => {
+  updateUserStatus = async (userId: string, status: "online" | "offline") => {
     return await prisma.user.update({
       where: {
-        userId: userId
+        userId: userId,
       },
       data: {
         userStatus: status,
-        lastActive: new Date()
+        lastActive: new Date(),
       },
       select: {
-        userStatus: true
-      }
-    })
-  }
+        userStatus: true,
+      },
+    });
+  };
 
-  getUserRecentActivities = async (userId: string): Promise<RecentActivities | null> => {
+  getUserRecentActivities = async (
+    userId: string
+  ): Promise<RecentActivities | null> => {
     return await prisma.recentActivity.findUnique({
       where: {
-        userId: userId
+        userId: userId,
       },
       select: {
         totalNewFriendRequests: true,
         totalNewUnseenChats: true,
         unseenAcceptedFriendRequests: true,
-      }
-    })
-  }
+      },
+    });
+  };
   async updateRecentActivities(userId: string, data: any): Promise<any> {
-      
     return prisma.recentActivity.update({
       where: {
-        userId: userId
+        userId: userId,
       },
-      data: {...data,lastUpdated: new Date()},
-    })
+      data: { ...data, lastUpdated: new Date() },
+    });
   }
+  searchFriends = async (query: string, chatRoomId: string, userId: string) => {
+    const res = await prisma.$queryRaw<Omit<MiniUserProfile,"bio">[]>`
+      WITH eligible_friends AS (
+          SELECT DISTINCT
+              u."userId",
+              u."username",
+              u."profilePicture"
+          FROM "User" u
+          JOIN "Friendship" frnd ON (
+              (
+                  (frnd."userId2" = u."userId" AND frnd."userId1" = ${userId}::uuid) 
+                  OR 
+                  (frnd."userId1" = u."userId" AND frnd."userId2" = ${userId}::uuid)
+              )
+              AND (frnd."status" = 'accepted' OR frnd."chatRoomId" IS NOT NULL)
+          )
+          WHERE 
+              u."userId" != ${userId}::uuid
+              AND similarity(u."username", ${query}) > 0.2
+      )
+      SELECT 
+          ef."userId",
+          ef."username",
+          ef."profilePicture"
+      FROM eligible_friends ef
+      WHERE NOT EXISTS (
+          SELECT 1 
+          FROM "ChatRoomMember" crm 
+          WHERE crm."userId" = ef."userId" 
+          AND crm."chatRoomId" = ${chatRoomId}::uuid
+          AND crm."removedAt" IS NULL
+      )
+
+    `;
+
+   return res
+  };
 }

@@ -37,11 +37,12 @@ export class MediaService {
     }
   ): Promise<string> {
     
+
     const result = await bucket.file(path).getSignedUrl({
       version: "v4",
       action: "read",
       expires: Date.now() + (options?.expiresIn || this.DEFAULT_EXPIRY),
-      responseDisposition: `attachment; filename="${options?.fileName || path}"`
+      responseDisposition: `attachment; filename="${options?.fileName || path}"`,
     });
 
     return result[0];

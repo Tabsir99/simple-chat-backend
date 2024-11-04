@@ -34,17 +34,16 @@ export const validateReqQuery =
       const result = schema.safeParse(query);
 
       if (!result.success) {
-        throw new Error("Invalid query format", {
+        throw new Error(`${result.error.name}`, {
           cause: result.error.errors,
         });
       }
-      req.query.query = result.data.query;
+      req.query = result.data;
     } catch (error) {
       if (error instanceof Error) {
         const response = formatResponse({
           message: "Invalid query format",
           success: false,
-          error: JSON.parse(error.message),
         });
         return res.status(400).json(response);
       }

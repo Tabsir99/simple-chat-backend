@@ -21,7 +21,6 @@ export default class UserService implements IUserService {
     return email.trim().split("@")[0];
   }
 
-  
   getUserId = async (email: string): Promise<string | null> => {
     const userID = await this.userRepository.getUserId(email);
     if (!userID?.userId) return null;
@@ -83,11 +82,23 @@ export default class UserService implements IUserService {
   };
 
   queryByUsername = async (
-    query: string,
+    query: { query: string; chatRoomId?: string },
     userId: string
   ): Promise<Array<MiniUserProfile> | null> => {
     try {
-      const result = await this.userRepository.searchUsername(query, userId);
+      if (!query.chatRoomId) {
+        const result = await this.userRepository.searchUsername(
+          query.query,
+          userId
+        );
+        return result;
+      }
+      const result = await this.userRepository.searchFriends(
+        query.query,
+        query.chatRoomId,
+        userId
+      );
+
       return result;
     } catch (error) {
       console.error(error, " FROM USERSERVICE QUERY BY NAME");
@@ -125,7 +136,7 @@ export default class UserService implements IUserService {
   ) {
     try {
       if (event === "reset-friends") {
-       await this.userRepository.updateRecentActivities(userId, {
+        await this.userRepository.updateRecentActivities(userId, {
           totalNewFriendRequests: 0,
           unseenAcceptedFriendRequests: 0,
         });
@@ -135,10 +146,10 @@ export default class UserService implements IUserService {
           totalNewUnseenChats: 0,
         });
       }
-      return true
+      return true;
     } catch (error: any) {
-      console.error(error.message)
-      return false
+      console.error(error.message);
+      return false;
     }
   }
 }

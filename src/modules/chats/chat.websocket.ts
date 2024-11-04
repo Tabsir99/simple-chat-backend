@@ -46,39 +46,5 @@ export default class ChatWebSocketHandler implements IConnectionEventHandler {
       }
     });
 
-    socket.on(
-      "member:remove",
-      async ({
-        chatRoomId,
-        userId,
-      }: {
-        chatRoomId: string;
-        userId: string;
-      }) => {
-        if (!socket.userId || socket.rooms.has(socket.userId)) return;
-
-        const res = await this.chatService.updateGroupMembership(
-          chatRoomId,
-          userId,
-          socket.userId
-        );
-        console.log(res);
-        if (!res) return;
-        io?.to(chatRoomId).emit("chatEvent", {
-          event: "member:remove",
-          data: { chatRoomId: chatRoomId, userId: userId },
-        });
-        io?.to(chatRoomId).emit("messageEvent", {
-          event: "message:new",
-          data: {
-            chatRoomId,
-            message: {
-              ...res,
-              type: "system",
-            },
-          },
-        });
-      }
-    );
   }
 }

@@ -60,3 +60,9 @@ export interface FilterMessageOption {
   removedAt: Date | null;
   chatClearedAt: Date | null;
 }
+
+export interface MinifiedMessage{
+  messageId: string;
+  content: string;
+  createdAt: Date;
+}

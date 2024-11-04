@@ -15,5 +15,6 @@ export const userQuerySchema = z.object({
       z.string()
         .min(1, { message: "Query can't be empty" })
         .max(30, { message: "Query can't be more than 30 characters" })
-    )
+    ),
+  chatRoomId: z.string().uuid().optional()
 });
