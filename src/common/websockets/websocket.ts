@@ -140,6 +140,13 @@ export class WebSocketManager {
   }
 
   private addUser(userId: string, socketId: string): void {
+    if(!this.io) return
+    const currentUser = this.connectedUsers.get(userId)
+    if(currentUser){
+      this.io.to(currentUser.socketId).emit("closed","NEW_WINDOW")
+      this.io.in(currentUser.socketId).disconnectSockets(true)
+    }
+
     this.connectedUsers.set(userId, { userId, socketId, activeChatId: null });
   }
 
