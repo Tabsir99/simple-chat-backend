@@ -8,19 +8,25 @@ import authRoute from "./modules/authentication/auth.routes";
 import userRoute from "./modules/users/user.routes";
 import friendRoute from "./modules/friendship/frnd.routes";
 import chatRoute from "./modules/chats/chat.routes";
-import { createServer } from "http";
+import { createServer } from "https";
+
 import { WebSocketManager } from "./common/websockets/websocket";
 import container from "./inversify/bindings";
 import { TYPES } from "./inversify/types";
 import messageRouter from "./modules/messages/message.routes";
 import mediaRouter from "./modules/media/media.route";
 import EventEmitter from "events";
+import { readFileSync } from "fs";
+import "./common/utils/cronJobs"
 
 
+const cert = readFileSync("./ssl/cert.pem")
+const key = readFileSync("./ssl/key.pem")
 
 process.env.TZ = "UTC"
 const app = express();
-const httpServer = createServer(app);
+const httpServer = createServer({cert: cert,key},app);
+
 const webSocketManager = container.get<WebSocketManager>(
   TYPES.WebSocketManager
 );

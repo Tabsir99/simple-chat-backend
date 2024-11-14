@@ -10,7 +10,7 @@ const authRoute = Router();
 
 const authController = container.get<AuthController>(TYPES.AuthController)
 
-authRoute.post("/send-verification-email", validateRequestBody(logInSchema), authController.sendVerificationEmail);
+authRoute.post("/auth/send-verification-email", validateRequestBody(logInSchema), authController.sendVerificationEmail);
 authRoute.get("/auth/login", authController.loginWithEmail);
 authRoute.get("/auth/google", authController.redirectToGoogleAuth);
 authRoute.get("/auth/google/callback", authController.handleGoogleAuthCallback);

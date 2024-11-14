@@ -37,13 +37,13 @@ export default class ChatWebSocketHandler implements IConnectionEventHandler {
     socket,
     connectedUsers,
   }: WebsocketHandlerParams): Promise<void> {
+    
     socket.on("user:typing", (ev: TypingEventData) => {
       if (socket.rooms.has(ev.chatRoomId)) {
         socket.to(ev.chatRoomId).emit("messageEvent", {
           event: "user:typing",
           data: ev,
         });
-        console.log("typing...");
       }
     });
 

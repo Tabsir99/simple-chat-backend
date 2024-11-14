@@ -34,6 +34,7 @@ export default class AuthController {
     next: NextFunction
   ): Promise<Response> => {
     const { email } = req.body;
+
     const response = await this.authService.sendVerificationEmail(email);
     return res.json(response);
   };

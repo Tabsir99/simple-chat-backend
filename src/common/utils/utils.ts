@@ -5,6 +5,14 @@ export const generateUsernameFromEmail = (email: string): string => {
   return username.charAt(0).toUpperCase() + username.slice(1).toLowerCase();
 };
 
+export const escapeHtml = (unsafeText: string) => {
+  return unsafeText
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
 export async function getGoogleJWKs() {
   const response = await fetch("https://www.googleapis.com/oauth2/v3/certs");
   const jwks = await response.json();
@@ -278,7 +286,7 @@ export const validReactionSet = new Set([
   "👌",
   "🤌",
   "🤏",
-  "✌️",
+  "🎉",
   "🤞",
   "🤟",
   "🤘",

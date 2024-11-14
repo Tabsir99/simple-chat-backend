@@ -174,6 +174,9 @@ CREATE INDEX "ChatRoom_lastActivity_idx" ON "ChatRoom"("lastActivity");
 CREATE INDEX "Attachment_messageId_idx" ON "Attachment"("messageId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Attachment_messageId_key" ON "Attachment"("messageId");
+
+-- CreateIndex
 CREATE INDEX "MessageReceipt_readAt_idx" ON "MessageReceipt"("readAt");
 
 -- CreateIndex

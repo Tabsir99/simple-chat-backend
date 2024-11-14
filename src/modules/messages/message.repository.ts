@@ -196,7 +196,7 @@ export class MessageRepository {
 
   async createMessage(
     chatId: string,
-    messageData:  {
+    messageData: {
       messageId: string;
       sender: IMessage["sender"];
       content?: string;
@@ -208,7 +208,6 @@ export class MessageRepository {
   ) {
     return await prisma.$transaction([
       prisma.message.create({
-
         data: {
           messageId: messageData.messageId,
           content: messageData.content || "",
@@ -253,8 +252,8 @@ export class MessageRepository {
           },
         },
         select: {
-          lastActivity: true
-        }
+          lastActivity: true,
+        },
       }),
     ]);
   }
@@ -335,13 +334,25 @@ export class MessageRepository {
     });
   };
 
-  async updateMessage(messageId: string, updateData: any) {
-    // return await prisma.message.update({
-    //     where: { id: messageId },
-    //     data: updateData,
-    // });
+  async updateMessage(messageId: string, newContent: string) {
+    return await prisma.message.update({
+      where: { messageId: messageId },
+      data: {
+        content: newContent,
+        isEdited: true,
+      },
+    });
   }
-
+  async deleteMessage(messageId: string) {
+    return await prisma.message.update({
+      where: { messageId: messageId },
+      data: {
+        content: "",
+        isDeleted: true,
+        Attachment: { deleteMany: { messageId: messageId } },
+      },
+    });
+  }
 
   async toggleReaction(
     messageId: string,

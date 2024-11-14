@@ -17,10 +17,10 @@ if (getApps().length === 0) {
 const storage = getStorage(app);
 const bucket = storage.bucket();
 
-// const policy = await bucket.iam.getPolicy()
+// const policy = await bucket.getMetadata()
 // await bucket.setCorsConfiguration([
 //   {
-//     origin: ["http://localhost:5000"],
+//     origin: ["https://192.168.0.103:5000"],
 //     method: ["PUT", "GET"],
 //     responseHeader: ["Content-Type", "Access-Control-Allow-Origin"], // Add this
 //     maxAgeSeconds: 604800,

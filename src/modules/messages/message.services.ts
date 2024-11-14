@@ -28,8 +28,7 @@ export class MessageService {
     @inject(TYPES.MessageRepository)
     private messageRepository: MessageRepository,
     @inject(TYPES.MediaService) private mediaService: MediaService,
-    @inject(TYPES.ChatService) private chatService: ChatServices,
-    
+    @inject(TYPES.ChatService) private chatService: ChatServices
   ) {}
 
   async getMessagesByChatId(
@@ -42,7 +41,7 @@ export class MessageService {
       chatId
     );
     if (!chatRoomMemberInfo) {
-      throw MessageError.memberAccessDenied()
+      throw MessageError.memberAccessDenied();
     }
 
     if (!cursor.createdAt || !cursor.messageId) {
@@ -100,7 +99,7 @@ export class MessageService {
   };
   async createMessageInChat(
     chatId: string,
-    messageData:  {
+    messageData: {
       messageId: string;
       sender: IMessage["sender"];
       content?: string;
@@ -114,9 +113,7 @@ export class MessageService {
     let signedUrlPromise: Promise<string> | undefined;
 
     if (attachment) {
-      const path = `chatRoom/${chatId}/${
-        messageData.messageId
-      }.${attachment.fileName}`;
+      const path = `chatRoom/${chatId}/${messageData.messageId}.${attachment.fileName}`;
       attachmentToSave = {
         fileName: attachment.fileName,
         filePath: path,
@@ -160,10 +157,16 @@ export class MessageService {
     return await this.messageRepository.getChatroomMembers(chatId);
   }
 
-  async updateMessage(messageId: string, updateData: any) {
-    return await this.messageRepository.updateMessage(messageId, updateData);
+  async updateMessage(messageId: string, editedContent?: string) {
+    if (editedContent) {
+      return await this.messageRepository.updateMessage(
+        messageId,
+        editedContent
+      );
+    } else {
+      return await this.messageRepository.deleteMessage(messageId);
+    }
   }
-
 
   async addReactionToMessage(
     messageId: string,

@@ -144,9 +144,7 @@ export default class MessageWebSocketHandler
               },
               chatRoomId,
               readBy,
-              attachment: attachment
-                ? { ...attachment }
-                : undefined,
+              attachment: attachment ? { ...attachment } : undefined,
             },
           });
 
@@ -207,8 +205,54 @@ export default class MessageWebSocketHandler
       }
     );
 
-    // socket.on("message:failed",(ev: {code: "FILE_SIZE_LIMIT"}) => {
+    socket.on(
+      "message:edit",
+      ({
+        chatRoomId,
+        editedMessage,
+        messageId,
+      }: {
+        chatRoomId: string;
+        messageId: string;
+        editedMessage: string;
+      }) => {
+        if (!socket.rooms.has(chatRoomId)) return;
 
-    // })
+        this.messageService.updateMessage(messageId, editedMessage);
+        socket.to(chatRoomId).emit("messageEvent", {
+          event: "message:edit",
+          data: {
+            messageId,
+            chatRoomId,
+            editedMessage,
+          },
+        });
+      }
+    );
+
+    socket.on(
+      "message:delete",
+      ({
+        chatRoomId,
+        messageId,
+      }: {
+        chatRoomId: string;
+        messageId: string;
+      }) => {
+        console.log("Hello from emssage delete")
+
+        if (!socket.rooms.has(chatRoomId)) return;
+
+        console.log("Hello from emssage delete")
+        this.messageService.updateMessage(messageId);
+        socket.to(chatRoomId).emit("messageEvent", {
+          event: "message:delete",
+          data: {
+            messageId,
+            chatRoomId,
+          },
+        });
+      }
+    );
   }
 }
