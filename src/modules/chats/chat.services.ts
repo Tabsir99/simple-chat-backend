@@ -5,6 +5,7 @@ import { getMimeType } from "../../common/utils/utils";
 import { $Enums, ChatRole, FileType } from "@prisma/client";
 import FriendshipService from "../friendship/frnd.services";
 import { ChatRoomHead } from "./chats.interfaces";
+import { ChatError } from "../../common/errors/chatErrors";
 
 @injectable()
 export default class ChatServices {
@@ -113,7 +114,7 @@ export default class ChatServices {
     username: string,
     nickname?: string
   ) => {
-    let res: { messageId: string, content: string, createdAt: Date}
+    let res: { messageId: string; content: string; createdAt: Date };
 
     const currentUser = await this.verifyUserPermission(
       currentUserId,
@@ -121,28 +122,24 @@ export default class ChatServices {
     );
 
     if (action === "nickname") {
-      res = (
-        await this.chatRepository.updateGroupMember(
-          chatRoomId,
-          userId,
-          currentUserId === userId?"his":`${username}'s`,
-          nickname as string,
-          currentUser.username
-        )
+      res = await this.chatRepository.updateGroupMember(
+        chatRoomId,
+        userId,
+        currentUserId === userId ? "his" : `${username}'s`,
+        nickname as string,
+        currentUser.username
       );
       return res;
     }
 
     if (!currentUser.isAdmin) throw new Error("Not enough permission");
 
-    res = (
-      await this.chatRepository.updateGroupMemberRole(
-        chatRoomId,
-        userId,
-        action === "demote" ? "member" : "admin",
-        username,
-        currentUser.username
-      )
+    res = await this.chatRepository.updateGroupMemberRole(
+      chatRoomId,
+      userId,
+      action === "demote" ? "member" : "admin",
+      username,
+      currentUser.username
     );
 
     return res;
@@ -178,7 +175,7 @@ export default class ChatServices {
 
   validateMember = async (userId: string, chatRoomId: string) => {
     const res = await this.chatRepository.findChatRoom(userId, chatRoomId);
-
+    if (!res || res.removedAt) throw ChatError.memberAccessDenied();
     return res;
   };
 
@@ -192,11 +189,17 @@ export default class ChatServices {
   };
 
   addMember = async (
-    data: { chatRoomId: string; users: {userId: string, username: string}[] },
+    data: { chatRoomId: string; users: { userId: string; username: string }[] },
     currentUserId: string
   ) => {
-    const currentUser = await this.verifyUserPermission(currentUserId,data.chatRoomId)
-    const res = await this.chatRepository.addGroupMember(data,currentUser.username);
+    const currentUser = await this.verifyUserPermission(
+      currentUserId,
+      data.chatRoomId
+    );
+    const res = await this.chatRepository.addGroupMember(
+      data,
+      currentUser.username
+    );
     return res;
   };
 
@@ -214,5 +217,15 @@ export default class ChatServices {
       username: res.user.username,
     };
   };
+
+  leaveGroup = async (userId: string, chatRoomId: string, username: string) => {
+    const res = await this.chatRepository.deleteGroupMember(
+      chatRoomId,
+      userId,
+      userId,
+      username,
+      username
+    );
+    return res;
+  };
 }
- 

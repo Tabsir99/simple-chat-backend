@@ -110,14 +110,12 @@ export class WebSocketManager {
       const userId = socket.userId as string;
       this.addUser(userId, socket.id);
 
-      // Notify handlers of new connection
       this.connectionEventHandlers.forEach((handler) => {
         if (handler.onConnect) {
           handler.onConnect(userId, socket);
         }
       });
 
-      // Set up handlers
       this.connectionEventHandlers.forEach((handler) => {
         handler.handle({
           io: this.io,

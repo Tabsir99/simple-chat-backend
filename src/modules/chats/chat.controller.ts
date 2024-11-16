@@ -5,6 +5,7 @@ import ChatServices from "./chat.services";
 import { formatResponse } from "../../common/utils/responseFormatter";
 import { WebSocketManager } from "../../common/websockets/websocket";
 import { EventManager } from "../../common/config/eventService";
+import { ChatError } from "../../common/errors/chatErrors";
 
 @injectable()
 export default class ChatControllers {
@@ -101,11 +102,11 @@ export default class ChatControllers {
   updateMember = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const currentUserId = req.user.userId as string;
-      const { action, chatRoomId, userId, nickname,username } = req.body as {
+      const { action, chatRoomId, userId, nickname, username } = req.body as {
         chatRoomId: string;
         userId: string;
         action: "promote" | "demote" | "nickname";
-        username: string
+        username: string;
         nickname?: string;
       };
       if (currentUserId === userId && action !== "nickname") {
@@ -133,14 +134,14 @@ export default class ChatControllers {
             currentUserId: currentUserId,
             targetUserId: userId,
             chatRoomId: chatRoomId,
-            userRole: action === "promote"?"admin":"member",
+            userRole: action === "promote" ? "admin" : "member",
           },
         });
-        this.eventManager.emit("message:new",{
+        this.eventManager.emit("message:new", {
           chatRoomId: chatRoomId,
           currentUserId: currentUserId,
-          message: result
-        })
+          message: result,
+        });
       }
 
       if (action === "nickname") {
@@ -153,11 +154,11 @@ export default class ChatControllers {
             nickname: nickname,
           },
         });
-        this.eventManager.emit("message:new",{
+        this.eventManager.emit("message:new", {
           chatRoomId: chatRoomId,
           currentUserId: currentUserId,
-          message: result
-        })
+          message: result,
+        });
       }
       if (result) {
         return res.json(
@@ -169,7 +170,7 @@ export default class ChatControllers {
         );
       }
     } catch (error) {
-      return next("ye");
+      return next(error);
     }
   };
 
@@ -195,32 +196,45 @@ export default class ChatControllers {
 
   addMember = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = req.body as { chatRoomId: string; users: {userId: string, username: string}[] };
+      const data = req.body as {
+        chatRoomId: string;
+        users: { userId: string; username: string }[];
+      };
       const userId = req.user.userId as string;
 
       const message = await this.chatServices.addMember(data, userId);
 
       this.eventManager.emit("member:add", {
         chatRoomId: data.chatRoomId,
-        users: data.users.map(user => user.userId),
+        users: data.users.map((user) => user.userId),
         currentUserId: userId,
       });
-      this.eventManager.emit("message:new",{
+      this.eventManager.emit("message:new", {
         chatRoomId: data.chatRoomId,
         currentUserId: userId,
-        message
-      })
+        message,
+      });
 
       return res.json(
         formatResponse({
           success: true,
           message: "Member added",
-          data: message
+          data: message,
         })
       );
     } catch (error) {
-      console.log(error);
-      return next("err");
+      if (error instanceof ChatError) {
+        console.log(error.errorCode, error.statusCode);
+        if (error.errorCode === "MEMBER_ALREADY_EXISTS") {
+          return res.status(400).json(
+            formatResponse({
+              success: false,
+              message: error.message,
+            })
+          );
+        }
+      }
+      return next(error);
     }
   };
 
@@ -229,7 +243,7 @@ export default class ChatControllers {
       chatId: string;
       memberId: string;
     };
-    const {username} = req.query as {username: string}
+    const { username } = req.query as { username: string };
     const currentUserId = req.user.userId as string;
     const result = await this.chatServices.updateGroupMembership(
       chatId,
@@ -250,16 +264,51 @@ export default class ChatControllers {
       currentUserId,
     });
 
-    this.eventManager.emit("message:new",{
+    this.eventManager.emit("message:new", {
       chatRoomId: chatId,
       currentUserId: currentUserId,
-      message: result
-    })
+      message: result,
+    });
     return res.json(
       formatResponse({
         success: true,
         data: result,
       })
     );
+  };
+
+  leaveGroup = async (req: Request, res: Response, next: NextFunction) => {
+    const userId = req.user.userId as string;
+    const chatRoomId = req.params.chatId as string;
+    const username = req.query.username as string;
+
+    try {
+      const result = await this.chatServices.leaveGroup(
+        userId,
+        chatRoomId,
+        username
+      );
+
+      console.log(result)
+
+      this.eventManager.emit("member:remove", {
+        chatRoomId: chatRoomId,
+        userId: userId,
+        currentUserId: userId,
+      });
+  
+      this.eventManager.emit("message:new", {
+        chatRoomId: chatRoomId,
+        currentUserId: userId,
+        message: result,
+      });
+      
+      return res.json(formatResponse({
+        success: true,
+        data: result
+      }))
+    } catch (error) {
+      return next(error)
+    }
   };
 }

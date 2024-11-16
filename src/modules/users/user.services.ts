@@ -86,6 +86,7 @@ export default class UserService implements IUserService {
     userId: string
   ): Promise<Array<MiniUserProfile> | null> => {
     try {
+
       if (!query.chatRoomId) {
         const result = await this.userRepository.searchUsername(
           query.query,

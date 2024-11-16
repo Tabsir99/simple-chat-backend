@@ -185,6 +185,28 @@ export class MessageService {
     }
   }
 
+  searchMessages = async (
+    chatRoomId: string,
+    query: string,
+    userId: string
+  ) => {
+    try {
+      const isMemberValid = await this.chatService.validateMember(
+        userId,
+        chatRoomId
+      );
+      const queryResult = await this.messageRepository.queryMessages(
+        chatRoomId,
+        this.createFlexibleQuery(query),
+        isMemberValid
+      );
+
+      return queryResult;
+    } catch (error) {
+      console.log(error);
+      throw new Error("Error occured");
+    }
+  };
   private mapMessages(
     rawMessages: IRawMessage[],
     oppositeMember:
@@ -251,5 +273,25 @@ export class MessageService {
     });
 
     return { messages, attachments };
+  }
+
+  private createFlexibleQuery(query: string): string {
+    const tokens = query
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .map((word) => word.replace(/[&|!():*]/g, "\\$&"));
+
+    if (tokens.length === 0) return "";
+
+    if (tokens.length === 1) {
+      return `${tokens[0]}:*`;
+    }
+
+    const lastIndex = tokens.length - 1;
+    tokens[lastIndex] = `${tokens[lastIndex]}:*`;
+    return tokens
+      .map((token, i) => (i === lastIndex ? token : `${token}`))
+      .join(" & ");
   }
 }

@@ -5,8 +5,9 @@ import {
   FilterMessageOption,
   IMessage,
   IRawMessage,
+  MinifiedMessage,
 } from "./message.interface";
-import { $Enums } from "@prisma/client";
+import { $Enums, Prisma } from "@prisma/client";
 import { getFileTypeFromMimeType } from "../../common/utils/utils";
 import { randomUUID } from "crypto";
 
@@ -377,4 +378,50 @@ export class MessageRepository {
     AND NOT EXISTS (SELECT 1 FROM upsert)
     `;
   }
+
+  queryMessages = async (
+    chatRoomId: string,
+    query: string,
+    memberInfo: {
+      joinedAt: Date;
+      removedAt: Date | null;
+      chatClearedAt: Date | null;
+    }
+  ) => {
+    console.log(memberInfo); // queryis pre formatted using | operator
+    const res = await prisma.$queryRaw<MinifiedMessage[]>`
+    SELECT m."messageId",m."content",m."createdAt",u."username",u."profilePicture",
+    ts_rank_cd(m.search_vector, to_tsquery('english',${query})) AS rank
+    FROM "Message" m
+    INNER JOIN "User" u
+    ON m."senderId" = u."userId"
+    WHERE m."chatRoomId" = ${chatRoomId}::uuid
+    ${
+      memberInfo.chatClearedAt
+        ? Prisma.sql`AND m."createdAt" > ${memberInfo.chatClearedAt}`
+        : Prisma.sql``
+    }
+    ${
+      memberInfo.removedAt
+        ? Prisma.sql`AND m."createdAt" < ${memberInfo.removedAt}`
+        : Prisma.sql``
+    }
+    AND m.search_vector @@ to_tsquery('english',${query})
+    ORDER BY rank DESC
+    `;
+
+    console.log(res);
+    return res;
+  };
 }
+
+/* 
+AND m."createdAt" > ${memberInfo.chatClearedAt}
+    ${
+      memberInfo.removedAt
+        ? Prisma.sql`AND m."createdAt" < ${memberInfo.removedAt}`
+        : Prisma.sql``
+    }
+    AND 
+
+*/
