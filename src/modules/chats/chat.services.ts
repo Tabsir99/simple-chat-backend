@@ -6,12 +6,14 @@ import { $Enums, ChatRole, FileType } from "@prisma/client";
 import FriendshipService from "../friendship/frnd.services";
 import { ChatRoomHead } from "./chats.interfaces";
 import { ChatError } from "../../common/errors/chatErrors";
+import { MediaService } from "../media/media.services";
+import { randomUUID } from "crypto";
 
 @injectable()
 export default class ChatServices {
   constructor(
     @inject(TYPES.ChatRepository) private chatRepository: ChatRepository,
-    @inject(TYPES.FriendshipService) private frndService: FriendshipService
+    @inject(TYPES.MediaService) private mediaService: MediaService
   ) {}
 
   getChats = async (userId: string) => {
@@ -47,7 +49,7 @@ export default class ChatServices {
   createChatRoom = async (
     currentUserId: string,
     users: { userId: string; username: string }[],
-    isGroup: boolean
+    groupName: string
   ) => {
     try {
       const newUsers = users.map((user) => {
@@ -57,8 +59,9 @@ export default class ChatServices {
         };
       });
 
-      const result = await this.chatRepository.createChat(newUsers, isGroup);
-      return result;
+      const result = await this.chatRepository.createChat(newUsers, groupName);
+
+      return { ...result };
     } catch (error) {
       console.error(
         error instanceof Error
@@ -226,6 +229,58 @@ export default class ChatServices {
       username,
       username
     );
+    return res;
+  };
+
+  updateChat = async (
+    currentUserId: string,
+    chatRoomId: string,
+    data: {
+      roomName?: string;
+      imageName: string;
+      size: number;
+      imageType: string;
+      type: "name" | "image";
+    }
+  ) => {
+    try {
+      const { username } = await this.verifyUserPermission(
+        currentUserId,
+        chatRoomId
+      );
+
+      if (data.type === "name") {
+        const msg = await this.chatRepository.updateChat(
+          chatRoomId,
+          `${username} changed group name to ${data.roomName}`,
+          data.roomName as string
+        );
+
+        return msg;
+      } else {
+        const signedUrl = await this.mediaService.getWriteSignedUrl(
+          `avatars/chatRoom/${chatRoomId}`,
+          { contentSize: data.size, contentType: data.imageType }
+        );
+        return signedUrl;
+      }
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  updateChatRoomImage = async (chatRoomId: string, currentUserId: string) => {
+    const isUserValid = await this.verifyUserPermission(
+      currentUserId,
+      chatRoomId
+    );
+    const res = await this.chatRepository.updateChat(
+      chatRoomId,
+      `${isUserValid.username} updated the group avatar`,
+      undefined,
+      `https://storage.googleapis.com/simple-chat-cg.appspot.com/avatars/chatRoom/${chatRoomId}`
+    );
+
     return res;
   };
 }

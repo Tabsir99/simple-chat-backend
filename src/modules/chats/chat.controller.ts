@@ -57,41 +57,153 @@ export default class ChatControllers {
   };
 
   updateChat = async (req: Request, res: Response) => {
-    return res.status(500).json(
-      formatResponse({
-        success: false,
-        message: "Internal server error",
+    const data = req.body as {
+      roomName?: string;
+      imageName: string;
+      size: number;
+      imageType: string;
+      type: "name" | "image";
+    };
+    const chatRoomId = req.params.chatId as string;
+    const currentUserId = req.user.userId as string;
+
+    if (!chatRoomId) {
+      return res.status(400).json(
+        formatResponse({
+          success: false,
+          message: "Chat room ID is required",
+        })
+      );
+    }
+    if (data.type === "name") {
+      if (!data.roomName) {
+        return res.status(400).json(
+          formatResponse({
+            success: false,
+            message: "Room name is required for name update",
+          })
+        );
+      }
+    }
+    if (data.type === "image") {
+      if (!data.imageName) {
+        return res.status(400).json(
+          formatResponse({
+            success: false,
+            message: "Image name is required",
+          })
+        );
+      }
+
+      if (!data.imageType.startsWith("image")) {
+        return res.status(400).json(
+          formatResponse({
+            success: false,
+            message: "Invalid file type. Only images are allowed",
+          })
+        );
+      }
+
+      if (data.size > 5 * 1024 * 1024) {
+        return res.status(400).json(
+          formatResponse({
+            success: false,
+            message: "File size exceeds 5MB limit",
+          })
+        );
+      }
+    }
+
+    try {
+      const response = await this.chatServices.updateChat(
+        currentUserId,
+        chatRoomId,
+        data
+      );
+
+      if (typeof response === "string") {
+        return res.json(
+          formatResponse({
+            success: true,
+            data: response,
+          })
+        );
+      }
+
+      this.eventManager.emit("message:new", {
+        chatRoomId,
+        currentUserId,
+        message: response,
+      });
+
+      this.eventManager.emit("chatRoom:update",{
+        chatRoomId,
+        currentUserId,
+        data: {
+          roomName: data.roomName
+        }
       })
-    );
+
+      return res.json(
+        formatResponse({
+          success: true,
+          data: response,
+        })
+      );
+    } catch (error) {
+      return res.status(500).json(
+        formatResponse({
+          success: false,
+          message: "Internal server error",
+        })
+      );
+    }
   };
 
   createGroupChat = async (req: Request, res: Response) => {
     const currentUserId = req.user.userId as string;
-    const users = req.body as { userId: string; username: string }[];
+    const { members: users, groupName } = req.body as {
+      members: { userId: string; username: string }[];
+      groupName: string;
+    };
+
+    if (users.length < 2 || !groupName.trim()) {
+      return res.status(400).json(
+        formatResponse({
+          success: false,
+          message:
+            users.length < 2
+              ? "At least 2 users are required to create a group"
+              : "Group name is required",
+        })
+      );
+    }
 
     try {
       const result = await this.chatServices.createChatRoom(
         currentUserId,
         users,
-        true
+        groupName
       );
 
       this.eventManager.emit<{
         chatRoomId: string;
         users: { username: string; userId: string }[];
+        currentUserId: string;
       }>("chatRoom:create", {
         chatRoomId: result.chatRoom.chatRoomId,
         users: users,
+        currentUserId,
       });
 
-      res.json(
+      return res.json(
         formatResponse({
           success: true,
-          data: result.chatRoom,
+          data: result,
         })
       );
     } catch (error) {
-      res.status(500).json(
+      return res.status(500).json(
         formatResponse({
           success: false,
         })
@@ -289,26 +401,26 @@ export default class ChatControllers {
         username
       );
 
-      console.log(result)
-
       this.eventManager.emit("member:remove", {
         chatRoomId: chatRoomId,
         userId: userId,
         currentUserId: userId,
       });
-  
+
       this.eventManager.emit("message:new", {
         chatRoomId: chatRoomId,
         currentUserId: userId,
         message: result,
       });
-      
-      return res.json(formatResponse({
-        success: true,
-        data: result
-      }))
+
+      return res.json(
+        formatResponse({
+          success: true,
+          data: result,
+        })
+      );
     } catch (error) {
-      return next(error)
+      return next(error);
     }
   };
 }

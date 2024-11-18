@@ -61,7 +61,7 @@ export default class UserService implements IUserService {
             : rawUserInfo.createdAt
           : undefined,
         totalMessageSent: rawUserInfo._count
-          ? rawUserInfo._count.Message || 0
+          ? rawUserInfo._count.MessageSender || 0
           : undefined,
         totalChats: rawUserInfo._count?.ChatRoomMember,
         totalFriends: result?.data.count,

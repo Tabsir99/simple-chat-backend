@@ -14,16 +14,18 @@ CREATE TYPE "FileType" AS ENUM ('IMAGE_JPEG', 'IMAGE_PNG', 'IMAGE_GIF', 'IMAGE_W
 CREATE TYPE "MessageStatus" AS ENUM ('sent', 'delivered', 'seen', 'failed');
 
 -- CreateEnum
-CREATE TYPE "MessageType" AS ENUM ('user', 'system');
+CREATE TYPE "MessageType" AS ENUM ('user', 'system', 'call');
+
+-- CreateEnum
+CREATE TYPE "CallStatus" AS ENUM ('missed', 'connected', 'ended');
 
 -- CreateTable
 CREATE TABLE "User" (
     "userId" UUID NOT NULL,
     "username" VARCHAR(50) NOT NULL,
     "email" VARCHAR(200) NOT NULL,
-    "title" VARCHAR(100),
     "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "profilePicture" VARCHAR(250),
+    "profilePicture" VARCHAR(250) NOT NULL,
     "bio" VARCHAR(500),
     "lastActive" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "userStatus" "UserStatus" NOT NULL DEFAULT 'offline',
@@ -35,7 +37,7 @@ CREATE TABLE "User" (
 CREATE TABLE "ChatRoom" (
     "chatRoomId" UUID NOT NULL,
     "isGroup" BOOLEAN NOT NULL DEFAULT false,
-    "roomName" VARCHAR(100),
+    "roomName" VARCHAR(150),
     "createdAt" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "lastActivity" TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "lastMessageId" UUID,
@@ -58,8 +60,23 @@ CREATE TABLE "Message" (
     "isEdited" BOOLEAN NOT NULL DEFAULT false,
     "type" "MessageType" NOT NULL DEFAULT 'user',
     "status" "MessageStatus" NOT NULL DEFAULT 'sent',
+    "targetUserId" UUID,
 
     CONSTRAINT "Message_pkey" PRIMARY KEY ("messageId")
+);
+
+-- CreateTable
+CREATE TABLE "CallSession" (
+    "callId" TEXT NOT NULL,
+    "callerId" UUID NOT NULL,
+    "recipientId" UUID NOT NULL,
+    "isVideoCall" BOOLEAN NOT NULL,
+    "status" "CallStatus" NOT NULL,
+    "messageId" UUID NOT NULL,
+    "startTime" TIMESTAMP(3),
+    "endTime" TIMESTAMP(3),
+
+    CONSTRAINT "CallSession_pkey" PRIMARY KEY ("callId")
 );
 
 -- CreateTable
@@ -222,7 +239,19 @@ ALTER TABLE "Message" ADD CONSTRAINT "Message_chatRoomId_fkey" FOREIGN KEY ("cha
 ALTER TABLE "Message" ADD CONSTRAINT "Message_senderId_fkey" FOREIGN KEY ("senderId") REFERENCES "User"("userId") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Message" ADD CONSTRAINT "Message_targetUserId_fkey" FOREIGN KEY ("targetUserId") REFERENCES "User"("userId") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Message" ADD CONSTRAINT "Message_parentMessageId_fkey" FOREIGN KEY ("parentMessageId") REFERENCES "Message"("messageId") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CallSession" ADD CONSTRAINT "CallSession_callerId_fkey" FOREIGN KEY ("callerId") REFERENCES "User"("userId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CallSession" ADD CONSTRAINT "CallSession_recipientId_fkey" FOREIGN KEY ("recipientId") REFERENCES "User"("userId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CallSession" ADD CONSTRAINT "CallSession_messageId_fkey" FOREIGN KEY ("messageId") REFERENCES "Message"("messageId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Attachment" ADD CONSTRAINT "Attachment_messageId_fkey" FOREIGN KEY ("messageId") REFERENCES "Message"("messageId") ON DELETE CASCADE ON UPDATE CASCADE;

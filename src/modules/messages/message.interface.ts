@@ -32,17 +32,27 @@ export type Reactions = {
   users: string[];
 };
 
+export type CallInformation = {
+  callerId: string
+  isVideoCall: boolean
+  startTime: Date | null
+  endTime: Date | null
+  status: $Enums.CallStatus
+}
+
 export interface IRawMessage extends Message {
   sender: User | null;
   parentMessage: ParentMessage | null;
   MessageReaction: MessageReaction[];
   Attachment: Attachment[];
+  CallSession: CallInformation[] | null
 }
 
 export interface IMessage extends Message {
   MessageReaction: Reactions[];
   sender: User | null;
   parentMessage: ParentMessage | null;
+  callInformation: CallInformation | null
 }
 
 type Message = {

@@ -17,11 +17,10 @@ export interface RawUserData {
   username: string;
   email: string;
   bio: string | null;
-  title: string | null;
   profilePicture: string | null;
   createdAt: Date | string;
   _count: {
-    Message: number;
+    MessageSender: number;
     ChatRoomMember: number;
   };
 }

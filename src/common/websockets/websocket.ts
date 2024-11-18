@@ -85,11 +85,18 @@ export class WebSocketManager {
         return next(new Error("No Token provided"));
       }
       try {
+        console.log("websocket middleware running, token provided\n", token);
         const payload = await jwtVerify(
           token,
           new TextEncoder().encode(config.jwtSecretAccess)
         );
         const userId = payload.payload.userId as string;
+
+        const expiryDate = new Date((payload.payload.exp as number) * 1000);
+        console.log("Token expires at:", expiryDate.toLocaleString("en-US",{
+          timeZone: "Asia/Dhaka"
+        }));
+        
         socket.userId = userId;
       } catch (error) {
         console.error(
@@ -138,11 +145,11 @@ export class WebSocketManager {
   }
 
   private addUser(userId: string, socketId: string): void {
-    if(!this.io) return
-    const currentUser = this.connectedUsers.get(userId)
-    if(currentUser){
-      this.io.to(currentUser.socketId).emit("closed","NEW_WINDOW")
-      this.io.in(currentUser.socketId).disconnectSockets(true)
+    if (!this.io) return;
+    const currentUser = this.connectedUsers.get(userId);
+    if (currentUser) {
+      this.io.to(currentUser.socketId).emit("closed", "NEW_WINDOW");
+      this.io.in(currentUser.socketId).disconnectSockets(true);
     }
 
     this.connectedUsers.set(userId, { userId, socketId, activeChatId: null });
@@ -158,6 +165,7 @@ export class WebSocketManager {
     this.eventManager.on<{
       chatRoomId: string;
       users: { username: string; userId: string }[];
+      currentUserId: string;
     }>("chatRoom:create", (data) => {
       data?.users.forEach((user) => {
         const connectedUser = this.connectedUsers.get(user.userId);
@@ -165,6 +173,10 @@ export class WebSocketManager {
           io.in(connectedUser.socketId).socketsJoin(data.chatRoomId);
         }
       });
+
+      io.to(data.chatRoomId)
+        .except(this.connectedUsers.get(data.currentUserId)?.socketId || "")
+        .emit("chatEvent", { event: "chatRoom:create", data: null });
     });
 
     this.eventManager.on<{
@@ -197,12 +209,27 @@ export class WebSocketManager {
           event: "member:remove",
           data: { chatRoomId: chatRoomId, userId: userId },
         });
-        
+
       io.in(this.connectedUsers.get(userId)?.socketId || "").socketsLeave(
         chatRoomId
       );
     });
 
+    this.eventManager.on<{
+      chatRoomId: string;
+      data: any;
+      currentUserId: string;
+    }>("chatRoom:update", ({ chatRoomId, currentUserId, data }) => {
+      io.to(chatRoomId)
+        .except(currentUserId)
+        .emit("chatEvent", {
+          event: "chatRoom:update",
+          data: {
+            ...data,
+            chatRoomId,
+          },
+        });
+    });
     this.eventManager.on<{
       chatRoomId: string;
       users: string[];

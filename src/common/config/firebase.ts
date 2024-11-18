@@ -28,4 +28,32 @@ const bucket = storage.bucket();
 // ]);
 
 
+async function updateCacheControlForDirectory(prefix: string, cacheControlValue: string) {
+  try {
+    // Get all files under the specified prefix
+    const [files] = await bucket.getFiles({ prefix });
+
+    console.log(`Found ${files.length} files under prefix: ${prefix}`);
+    if (files.length === 0) {
+      console.log('No files to update.');
+      return;
+    }
+
+    // Update Cache-Control metadata for each file
+    const updatePromises = files.map(file =>
+      file.setMetadata({
+        cacheControl: cacheControlValue,
+      })
+    );
+
+    await Promise.all(updatePromises);
+    console.log(`Updated Cache-Control to "${cacheControlValue}" for all files.`);
+  } catch (err) {
+    console.error('Error updating file metadata:', err);
+  }
+}
+
+const cacheControlValue = 'public, max-age=31536000, immutable';
+// updateCacheControlForDirectory('avatars/default',cacheControlValue)
+
 export { bucket };

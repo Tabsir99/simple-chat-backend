@@ -33,7 +33,9 @@ export default class ChatRepository {
               u."profilePicture" AS "oppositeProfilePicture"
           FROM "ChatRoomMember" crm
           JOIN "User" u ON crm."userId" = u."userId"
+          JOIN "ChatRoom" chat ON crm."chatRoomId" = chat."chatRoomId"
           WHERE crm."userId" != ${userId}::uuid
+          AND chat."isGroup" = ${false}
       )
       SELECT 
           cr."chatRoomId",
@@ -86,20 +88,18 @@ export default class ChatRepository {
       userId: string;
       username: string;
     }[],
-    isGroup: boolean
+    groupName: string
   ) => {
     return await prisma.$transaction(async (tx) => {
+      const defaultProfie = `https://storage.googleapis.com/simple-chat-cg.appspot.com/avatars/default/default6.svg`;
       const isUser1Creator = users[0].isCreator;
 
       const chatRoom = await tx.chatRoom.create({
         data: {
-          isGroup: isGroup,
-          createdBy: isGroup
-            ? isUser1Creator
-              ? users[0].userId
-              : users[1].userId
-            : null,
-          roomName: `${users[0].username},${users[1].username}`,
+          isGroup: true,
+          createdBy: isUser1Creator ? users[0].userId : users[1].userId,
+          roomName: groupName || `${users[0].username},${users[1].username}`,
+          roomImage: defaultProfie,
           ChatRoomMember: {
             createMany: {
               data: [
@@ -121,6 +121,7 @@ export default class ChatRepository {
           isGroup: true,
           roomName: true,
           createdBy: true,
+          roomImage: true,
         },
       });
 
@@ -332,7 +333,6 @@ export default class ChatRepository {
     } ${willLeaveGroup ? "" : username + " from "}the group`;
 
     const result = await prisma.$transaction(async (tx) => {
-
       const message = await tx.message.create({
         data: {
           content: messageContent,
@@ -346,7 +346,7 @@ export default class ChatRepository {
         },
       });
 
-      const removalTime = new Date(message.createdAt.getTime() + 50)
+      const removalTime = new Date(message.createdAt.getTime() + 50);
       await tx.$executeRaw`
           UPDATE "ChatRoomMember"
           SET 
@@ -479,6 +479,42 @@ export default class ChatRepository {
           select: { username: true },
         },
       },
+    });
+  };
+
+  updateChat = async (
+    chatRoomId: string,
+    content: string,
+    data?: string,
+    url?: string
+  ) => {
+    return await prisma.$transaction(async (tx) => {
+      const newMessage = await tx.message.create({
+        data: {
+          content: content,
+          type: "system",
+          chatRoomId: chatRoomId,
+        },
+        select: {
+          messageId: true,
+          createdAt: true,
+          content: true,
+        },
+      });
+
+      await tx.chatRoom.update({
+        where: {
+          chatRoomId: chatRoomId,
+        },
+        data: {
+          ...(data && { roomName: data }),
+          ...(url && { roomImage: url }),
+          lastActivity: new Date(),
+          lastMessageId: newMessage.messageId,
+        },
+      });
+
+      return newMessage;
     });
   };
 }

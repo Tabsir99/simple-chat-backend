@@ -8,8 +8,6 @@ import {
   MinifiedMessage,
 } from "./message.interface";
 import { $Enums, Prisma } from "@prisma/client";
-import { getFileTypeFromMimeType } from "../../common/utils/utils";
-import { randomUUID } from "crypto";
 
 @injectable()
 export class MessageRepository {
@@ -53,6 +51,7 @@ export class MessageRepository {
         messageId: true,
         content: true,
         isDeleted: true,
+        isEdited: true,
         createdAt: true,
         status: true,
         type: true,
@@ -91,6 +90,16 @@ export class MessageRepository {
             fileType: true,
           },
         },
+
+        CallSession: {
+          select: {
+            callerId: true,
+            isVideoCall: true,
+            startTime: true,
+            endTime: true,
+            status: true,
+          },
+        },
       },
     });
 
@@ -107,7 +116,7 @@ export class MessageRepository {
     chatRoomMemberInfo: FilterMessageOption,
     cursor: { messageId: string; createdAt: Date }
   ): Promise<IRawMessage[]> => {
-    return await prisma.message.findMany({
+    const res = await prisma.message.findMany({
       where: {
         chatRoomId: chatId,
         createdAt: {
@@ -169,8 +178,20 @@ export class MessageRepository {
             fileType: true,
           },
         },
+
+        CallSession: {
+          select: {
+            callerId: true,
+            isVideoCall: true,
+            startTime: true,
+            endTime: true,
+            status: true,
+          },
+        },
       },
     });
+
+    return res
   };
 
   async findAllReciptsByChatId(chatId: string) {

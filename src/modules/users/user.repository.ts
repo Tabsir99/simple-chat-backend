@@ -6,6 +6,7 @@ import {
 } from "./user.service.interface";
 import prisma from "../../common/config/db";
 import { injectable } from "inversify";
+import { randomInt } from "crypto";
 
 @injectable()
 export class UserRepository implements IUserRepository {
@@ -27,9 +28,11 @@ export class UserRepository implements IUserRepository {
     username: string
   ): Promise<{ userId: string }> {
     try {
+      const defaultProfie = `https://storage.googleapis.com/simple-chat-cg.appspot.com/avatars/default/default${randomInt(1,6)}.svg`;
+
       return await prisma.$transaction(async (tx) => {
         const userId = await tx.user.create({
-          data: { email, username },
+          data: { email, username,profilePicture: defaultProfie },
           select: { userId: true },
         });
         await tx.recentActivity.create({
@@ -56,13 +59,12 @@ export class UserRepository implements IUserRepository {
       username: true,
       email: true,
       bio: true,
-      title: true,
       profilePicture: true,
       createdAt: true,
       _count: {
         select: {
           ChatRoomMember: true,
-          Message: {
+          MessageSender: {
             where: {
               senderId: userId,
             },

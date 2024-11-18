@@ -216,7 +216,7 @@ export default class FriendshipRepository {
       });
 
       if (res.chatRoomId) {
-       await prisma.chatRoom.updateMany({
+        await prisma.chatRoom.updateMany({
           where: {
             isGroup: false,
             OR: [
@@ -296,6 +296,7 @@ export default class FriendshipRepository {
       return existingChatRoom;
     }
 
+    
     const room = await tx.chatRoom.create({
       data: {
         isGroup: false,
@@ -306,6 +307,7 @@ export default class FriendshipRepository {
             { userId: userId2, userRole: "member" },
           ],
         },
+        
       },
       select: { chatRoomId: true },
     });

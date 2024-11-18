@@ -77,31 +77,39 @@ enum MessageStatus {
 enum MessageType {
   user
   system
+  call
 }
 
 model User {
   userId         String   @id @default(uuid()) @db.Uuid
   username       String   @db.VarChar(50)
   email          String   @unique @db.VarChar(200)
-  title          String?  @db.VarChar(100)
   createdAt      DateTime @default(now()) @db.Timestamp(6)
-  profilePicture String?  @db.VarChar(250)
+  profilePicture String  @db.VarChar(250)
   bio            String?  @db.VarChar(500)
 
   lastActive DateTime   @default(now()) @db.Timestamp(6)
   userStatus UserStatus @default(offline)
 
-  ChatRoomMember  ChatRoomMember[]
-  Friendships1    Friendship[]      @relation("User1Friendships")
-  Friendships2    Friendship[]      @relation("User2Friendships")
-  Sender          Friendship[]      @relation("senderFriendships")
+  ChatRoomMember ChatRoomMember[]
+
+  Friendships1   Friendship[]     @relation("User1Friendships")
+  Friendships2   Friendship[]     @relation("User2Friendships")
+  FriendReqSender         Friendship[]     @relation("senderFriendships")
   BlockedUser     Friendship[]      @relation("blockedUserFriendships")
+  
   MessageReaction MessageReaction[]
   RecentActivity  RecentActivity?
   ChatRoom        ChatRoom[]
-  Message         Message[]
+
+  MessageSender   Message[]
+  MessageTarget   Message[]         @relation("TargetUser")
+
   RefreshTokens   RefreshTokens[]
   TokenFamily     TokenFamily[]
+
+  Caller    CallSession[] @relation("CallerRelation")
+  Recipient CallSession[] @relation("RecipientRelation")
 
   @@index([email])
   @@index([lastActive])
@@ -110,7 +118,7 @@ model User {
 model ChatRoom {
   chatRoomId    String   @id @default(uuid()) @db.Uuid
   isGroup       Boolean  @default(false)
-  roomName      String?  @db.VarChar(100)
+  roomName      String?  @db.VarChar(150)
   createdAt     DateTime @default(now()) @db.Timestamp(6)
   lastActivity  DateTime @default(now()) @db.Timestamp(6)
   lastMessageId String?  @db.Uuid
@@ -118,7 +126,7 @@ model ChatRoom {
   roomImage     String?
   blockedUserId String?  @db.Uuid
 
-  Messages       Message[] // One-to-many relationship with messages
+  Messages       Message[]
   ChatRoomMember ChatRoomMember[]
 
   lastMessage Message?     @relation("LastMessage", fields: [lastMessageId], references: [messageId])
@@ -140,10 +148,12 @@ model Message {
   isEdited        Boolean       @default(false)
   type            MessageType   @default(user)
   status          MessageStatus @default(sent)
+  targetUserId    String?       @db.Uuid
 
-  // Relations
-  chatRoom      ChatRoom @relation(fields: [chatRoomId], references: [chatRoomId], onDelete: Cascade)
-  sender        User?    @relation(fields: [senderId], references: [userId], onDelete: Cascade)
+  chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [chatRoomId], onDelete: Cascade)
+  sender     User?    @relation(fields: [senderId], references: [userId], onDelete: Cascade)
+  targetUser User?    @relation("TargetUser", fields: [targetUserId], references: [userId])
+
   parentMessage Message? @relation("MessageReplies", fields: [parentMessageId], references: [messageId])
 
   Replies         Message[]         @relation("MessageReplies")
@@ -151,7 +161,29 @@ model Message {
   MessageReceipt  MessageReceipt[]
   MessageReaction MessageReaction[]
 
-  LastMessageFor ChatRoom[] @relation("LastMessage")
+  LastMessageFor ChatRoom[]    @relation("LastMessage")
+  CallSession    CallSession[]
+}
+
+model CallSession {
+  callId      String     @id @default(uuid())
+  callerId    String     @db.Uuid
+  recipientId String     @db.Uuid
+  isVideoCall Boolean
+  status      CallStatus
+  messageId   String     @db.Uuid
+  startTime   DateTime?
+  endTime     DateTime?
+
+  caller      User    @relation("CallerRelation", fields: [callerId], references: [userId])
+  recipient   User    @relation("RecipientRelation", fields: [recipientId], references: [userId])
+  callMessage Message @relation(fields: [messageId], references: [messageId])
+}
+
+enum CallStatus {
+  missed
+  connected
+  ended
 }
 
 model Attachment {

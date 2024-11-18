@@ -20,7 +20,6 @@ chatRoute.delete("/chats/:chatId/members/me",chatController.leaveGroup)
 chatRoute.delete("/chats/:chatId/members/:memberId",chatController.removeMember)
 
 chatRoute.post("/chats/groups", chatController.createGroupChat);
-
 chatRoute.put("/chats/:chatId", chatController.updateChat);
 
 

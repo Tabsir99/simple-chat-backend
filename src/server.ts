@@ -47,11 +47,6 @@ app.use(
 app.use(cookieParser());
 
 
-// app.use(async (_,__,next) => {
-//   await new Promise(res => setTimeout(res,2500))
-//   next()
-// })
-
 app.use("/api",authRoute)
 app.use("/api", messageRouter);
 app.use("/api",mediaRouter)

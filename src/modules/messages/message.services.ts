@@ -220,7 +220,7 @@ export class MessageService {
     attachments: Omit<Attachment, "filePath">[];
   } {
     const attachments: Omit<Attachment, "filePath">[] = [];
-    const messages = rawMessages.map((rawMessage) => {
+    const messages: IMessage[] = rawMessages.map((rawMessage) => {
       let status: "delivered" | "failed" | "sent" | "seen" = rawMessage.status;
       if (
         oppositeMember &&
@@ -241,6 +241,7 @@ export class MessageService {
       }
       return {
         messageId: rawMessage.messageId,
+
         content: rawMessage.content,
         createdAt: rawMessage.createdAt,
         isEdited: false,
@@ -269,6 +270,11 @@ export class MessageService {
         status: status,
         sender: rawMessage.sender,
         parentMessage: rawMessage.parentMessage,
+        callInformation: rawMessage.CallSession
+          ? {
+              ...rawMessage.CallSession[0],
+            }
+          : null,
       };
     });
 

@@ -92,4 +92,8 @@ export class MediaService {
 
     return result[0];
   }
+
+  async makeFilePublic(path: string) {
+    await bucket.file(path).makePublic()
+  }
 }
