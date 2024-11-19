@@ -85,7 +85,7 @@ model User {
   username       String   @db.VarChar(50)
   email          String   @unique @db.VarChar(200)
   createdAt      DateTime @default(now()) @db.Timestamp(6)
-  profilePicture String  @db.VarChar(250)
+  profilePicture String   @db.VarChar(250)
   bio            String?  @db.VarChar(500)
 
   lastActive DateTime   @default(now()) @db.Timestamp(6)
@@ -93,23 +93,23 @@ model User {
 
   ChatRoomMember ChatRoomMember[]
 
-  Friendships1   Friendship[]     @relation("User1Friendships")
-  Friendships2   Friendship[]     @relation("User2Friendships")
-  FriendReqSender         Friendship[]     @relation("senderFriendships")
-  BlockedUser     Friendship[]      @relation("blockedUserFriendships")
-  
+  Friendships1    Friendship[] @relation("User1Friendships")
+  Friendships2    Friendship[] @relation("User2Friendships")
+  FriendReqSender Friendship[] @relation("senderFriendships")
+  BlockedUser     Friendship[] @relation("blockedUserFriendships")
+
   MessageReaction MessageReaction[]
   RecentActivity  RecentActivity?
   ChatRoom        ChatRoom[]
 
-  MessageSender   Message[]
-  MessageTarget   Message[]         @relation("TargetUser")
+  MessageSender Message[]
+  MessageTarget Message[] @relation("TargetUser")
 
-  RefreshTokens   RefreshTokens[]
-  TokenFamily     TokenFamily[]
+  RefreshTokens RefreshTokens[]
+  TokenFamily   TokenFamily[]
 
-  Caller    CallSession[] @relation("CallerRelation")
-  Recipient CallSession[] @relation("RecipientRelation")
+  Caller          CallSession[]     @relation("CallerRelation")
+  CallParticipant CallParticipant[]
 
   @@index([email])
   @@index([lastActive])
@@ -166,23 +166,35 @@ model Message {
 }
 
 model CallSession {
-  callId      String     @id @default(uuid())
+  callId      String     @id @db.Uuid @default(uuid())
   callerId    String     @db.Uuid
-  recipientId String     @db.Uuid
   isVideoCall Boolean
   status      CallStatus
   messageId   String     @db.Uuid
-  startTime   DateTime?
-  endTime     DateTime?
+  chatRoomId  String     @db.Uuid
+  startTime   DateTime
+  endTime     DateTime
 
-  caller      User    @relation("CallerRelation", fields: [callerId], references: [userId])
-  recipient   User    @relation("RecipientRelation", fields: [recipientId], references: [userId])
-  callMessage Message @relation(fields: [messageId], references: [messageId])
+  caller          User              @relation("CallerRelation", fields: [callerId], references: [userId])
+  callMessage     Message           @relation(fields: [messageId], references: [messageId])
+  CallParticipant CallParticipant[]
+}
+
+model CallParticipant {
+  callId   String    @db.Uuid
+  userId   String    @db.Uuid
+  joinedAt DateTime
+  leftAt   DateTime?
+
+  user User        @relation(fields: [userId], references: [userId])
+  call CallSession @relation(fields: [callId], references: [callId])
+
+  @@id([callId, userId])
 }
 
 enum CallStatus {
   missed
-  connected
+  ongoing
   ended
 }
 

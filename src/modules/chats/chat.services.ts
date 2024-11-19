@@ -4,7 +4,7 @@ import ChatRepository from "./chat.repository";
 import { getMimeType } from "../../common/utils/utils";
 import { $Enums, ChatRole, FileType } from "@prisma/client";
 import FriendshipService from "../friendship/frnd.services";
-import { ChatRoomHead } from "./chats.interfaces";
+import { CallData, ChatRoomHead } from "./chats.interfaces";
 import { ChatError } from "../../common/errors/chatErrors";
 import { MediaService } from "../media/media.services";
 import { randomUUID } from "crypto";
@@ -282,5 +282,14 @@ export default class ChatServices {
     );
 
     return res;
+  };
+
+  createCallMessage = async (callData: CallData) => {
+    try {
+      const res = await this.chatRepository.createCallMessage(callData);
+      console.log("craeted message,",res)
+    } catch (error) {
+      console.log("error occurd",error)
+    }
   };
 }

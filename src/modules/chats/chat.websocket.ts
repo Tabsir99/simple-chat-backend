@@ -3,14 +3,13 @@ import { TYPES } from "../../inversify/types";
 import { inject, injectable } from "inversify";
 import ChatServices from "./chat.services";
 import {
-  IConnectedUser,
   IConnectionEventHandler,
   WebsocketHandlerParams,
 } from "../../common/websockets/websocket";
-import { EventManager } from "../../common/config/eventService";
-import { Server } from "socket.io";
-import { MessageService } from "../messages/message.services";
 import { MediaService } from "../media/media.services";
+
+import { randomUUID } from "crypto";
+import { CallData } from "./chats.interfaces";
 
 export type TypingEventData = {
   chatRoomId: string;
@@ -27,6 +26,8 @@ type MembershipUpdate = {
 
 @injectable()
 export default class ChatWebSocketHandler implements IConnectionEventHandler {
+  private activeCalls: Map<string, CallData> = new Map();
+
   constructor(
     @inject(TYPES.ChatService) private chatService: ChatServices,
     @inject(TYPES.MediaService) private mediaService: MediaService
@@ -53,18 +54,20 @@ export default class ChatWebSocketHandler implements IConnectionEventHandler {
 
     socket.on(
       "call-offer",
-      ({
-        isVideo,
+      async ({
+        isVideoCall,
         offer,
         to,
         caller,
         callId,
+        recipientId,
       }: {
         offer: RTCSessionDescriptionInit;
-        isVideo: boolean;
+        isVideoCall: boolean;
         to: string;
         callId: string;
         caller: { username: string; profilePicture: string };
+        recipientId: string;
       }) => {
         if (!socket.rooms.has(to)) return;
 
@@ -72,7 +75,7 @@ export default class ChatWebSocketHandler implements IConnectionEventHandler {
           event: "call:incoming",
           data: {
             from: offer,
-            isVideo,
+            isVideoCall,
             to,
             caller: {
               userId: socket.userId,
@@ -82,36 +85,101 @@ export default class ChatWebSocketHandler implements IConnectionEventHandler {
             callId,
           },
         });
+
+        const callData: CallData = {
+          callId,
+          callerId: socket.userId as string,
+          chatRoomId: to,
+          isVideoCall,
+          messageId: randomUUID(),
+          status: "initiating",
+          participants: [
+            {
+              userId: socket.userId as string,
+              joinedAt: new Date(),
+              leftAt: null,
+            },
+          ],
+        };
+
+        this.activeCalls.set(callId, callData);
       }
     );
 
     socket.on(
       "decline-call",
-      ({ callId, to, reason }: { callId: string; to: string, reason: string }) => {
+      async ({
+        callId,
+        to,
+        reason,
+      }: {
+        callId: string;
+        to: string;
+        reason: string;
+      }) => {
         if (!socket.rooms.has(to)) return;
 
         socket.to(to).emit("callEvent", {
           event: "call:ended",
           data: {
             callId,
-            reason
+            reason,
           },
         });
+
+        const callData = this.activeCalls.get(callId);
+        if (callData) {
+          const newCallData: CallData = {
+            ...callData,
+            status: "missed",
+            startTime: new Date(),
+            endTime: new Date(),
+          };
+
+          const newCallEvent = {
+            event: "message:new",
+            data: {
+              chatRoomId: to,
+              message: {
+                messageId: newCallData.messageId,
+                createdAt: new Date(),
+                type: "call",
+                callInformation: {
+                  callerId: newCallData.callerId,
+                  startTime: newCallData.startTime,
+                  endTime: newCallData.endTime,
+                  status: newCallData.status,
+                  isVideoCall: newCallData.isVideoCall,
+                },
+              },
+            },
+          };
+
+          socket.to(to).emit("messageEvent", newCallEvent);
+          socket.emit("messageEvent", newCallEvent);
+          this.chatService.createCallMessage(newCallData);
+        }
       }
     );
 
     socket.on(
       "call-answer",
-      ({ answer, to,callId }: { answer: RTCSessionDescriptionInit; to: string, callId: string }) => {
-        console.log(to);
-
+      async ({
+        answer,
+        to,
+        callId,
+      }: {
+        answer: RTCSessionDescriptionInit;
+        to: string;
+        callId: string;
+      }) => {
         if (!socket.rooms.has(to)) return;
 
         socket.to(to).emit("callEvent", {
           event: "call:answered",
           data: {
             answer,
-            callId
+            callId,
           },
         });
       }
@@ -135,17 +203,55 @@ export default class ChatWebSocketHandler implements IConnectionEventHandler {
       }
     );
 
-    socket.on("end-call", ({ callId, to }: { to: string; callId: string }) => {
-      if (!socket.rooms.has(to)) return;
+    socket.on(
+      "call-connected",
+      ({ callId, to }: { to: string; callId: string }) => {
+        const targetCall = this.activeCalls.get(to);
+        if (targetCall) {
+          const updatedCall: CallData = {
+            ...targetCall,
+            startTime: new Date(),
+            status: "ongoing",
+            participants: [
+              ...targetCall.participants,
+              {
+                userId: socket.userId as string,
+                joinedAt: new Date(),
+                leftAt: null,
+              },
+            ],
+          };
 
-      console.log("hello sucker", to);
-      socket.to(to).emit("callEvent", {
-        event: "call:ended",
-        data: {
-          callId,
-        },
-      });
-    });
+          this.activeCalls.set(callId, updatedCall);
+        }
+      }
+    );
+
+    socket.on(
+      "end-call",
+      async ({ callId, to }: { to: string; callId: string }) => {
+        if (!socket.rooms.has(to)) return;
+
+        console.log("hello sucker", to);
+        socket.to(to).emit("callEvent", {
+          event: "call:ended",
+          data: {
+            callId,
+          },
+        });
+
+        const callData = this.activeCalls.get(callId);
+        this.activeCalls.delete(callId);
+        if (callData) {
+          const updatedCall: CallData = {
+            ...callData,
+            status: "ended",
+            endTime: new Date(),
+          };
+          this.chatService.createCallMessage(updatedCall);
+        }
+      }
+    );
 
     socket.on(
       "chatRoom:update",

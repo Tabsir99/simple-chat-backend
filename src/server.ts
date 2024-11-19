@@ -18,6 +18,7 @@ import mediaRouter from "./modules/media/media.route";
 import EventEmitter from "events";
 import { readFileSync } from "fs";
 import "./common/utils/cronJobs"
+import prisma from "./common/config/db";
 
 
 const cert = readFileSync("./ssl/cert.pem")
@@ -99,3 +100,64 @@ console.log("Listener count", eventManager.totalListenersCount())
 
 
 // setInterval(() => console.clear(), 60000)
+
+
+
+
+async function main() {
+  await prisma.user.createMany({
+    data: [
+      {
+        userId: '06a3daca-7d7b-4afc-97f2-cad72db73984',
+        username: 'tabsirsfc',
+        email: 'tabsirsfc@gmail.com',
+        createdAt: new Date('2024-11-17T18:19:13.204Z'),
+        profilePicture: 'https://storage.googleapis.com/simple-chat-cg.appspot.com/avatars/defaul>',
+        bio: null,
+        lastActive: new Date('2024-11-18T03:10:49.658Z'),
+        userStatus: 'online',
+      },
+      {
+        userId: '2b5d761c-9a9c-41fd-bb93-c408fe3d3b63',
+        username: 'tabsir348',
+        email: 'tabsir348@gmail.com',
+        createdAt: new Date('2024-11-17T06:28:01.712Z'),
+        profilePicture: 'https://storage.googleapis.com/simple-chat-cg.appspot.com/avatars/defaul>',
+        bio: null,
+        lastActive: new Date('2024-11-18T10:30:56.826Z'),
+        userStatus: 'offline',
+      },
+      {
+        userId: 'd9a693c5-9d8b-48a2-af25-6b796c029f98',
+        username: 'tabsircg',
+        email: 'tabsircg@gmail.com',
+        createdAt: new Date('2024-11-17T06:25:37.221Z'),
+        profilePicture: 'https://storage.googleapis.com/simple-chat-cg.appspot.com/avatars/defaul>',
+        bio: null,
+        lastActive: new Date('2024-11-18T10:47:36.451Z'),
+        userStatus: 'online',
+      },
+      {
+        userId: '7c6864ed-9a0e-4a55-b0eb-ec987516cb51',
+        username: 'mdtabsir0021',
+        email: 'mdtabsir0021@gmail.com',
+        createdAt: new Date('2024-11-17T18:35:01.682Z'),
+        profilePicture: 'https://storage.googleapis.com/simple-chat-cg.appspot.com/avatars/defaul>',
+        bio: null,
+        lastActive: new Date('2024-11-17T18:52:12.763Z'),
+        userStatus: 'offline',
+      }
+    ]
+  });
+
+  console.log("Users have been inserted successfully.");
+}
+
+// main()
+//   .catch(e => {
+//     console.error(e);
+//     process.exit(1);
+//   })
+//   .finally(async () => {
+//     await prisma.$disconnect();
+//   });

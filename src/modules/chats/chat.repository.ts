@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
 import prisma from "../../common/config/db";
 import { randomUUID } from "crypto";
-import { ChatRoomHead } from "./chats.interfaces";
+import { CallData, ChatRoomHead } from "./chats.interfaces";
 import { Prisma } from "@prisma/client";
 import { ChatError } from "../../common/errors/chatErrors";
 
@@ -16,10 +16,13 @@ export default class ChatRepository {
               m."createdAt" AS "createdAt",
               u."userId" AS "senderUserId",
               u."username" AS "senderUsername",
-              atch."fileType" AS "fileType"
+              atch."fileType" AS "fileType",
+              c."callerId" AS "callerId",
+              c."status" AS "callStatus"
           FROM "Message" m
           LEFT JOIN "User" u ON m."senderId" = u."userId"
           LEFT JOIN "Attachment" atch ON m."messageId" = atch."messageId"
+          LEFT JOIN "CallSession" c ON m."messageId" = c."messageId"
           JOIN "ChatRoomMember" crm ON m."chatRoomId" = crm."chatRoomId" AND crm."userId" = ${userId}::uuid
           WHERE (crm."removedAt" IS NULL OR m."createdAt" < crm."removedAt")
           ORDER BY m."chatRoomId", m."createdAt" DESC
@@ -49,6 +52,8 @@ export default class ChatRepository {
           lm."senderUserId",
           lm."senderUsername",
           lm."fileType",
+          lm."callerId",
+          lm."callStatus",
           om."oppositeUserId",
           om."oppositeUsername",
           om."oppositeUserStatus",
@@ -515,6 +520,34 @@ export default class ChatRepository {
       });
 
       return newMessage;
+    });
+  };
+
+  createCallMessage = async (callData: CallData) => {
+    return await prisma.message.create({
+      data: {
+        content: "",
+        chatRoomId: callData.chatRoomId,
+        type: "call",
+
+        CallSession: {
+          create: {
+            chatRoomId: callData.chatRoomId,
+            isVideoCall: callData.isVideoCall,
+            status: callData.status as any,
+            callerId: callData.callerId,
+            startTime: callData.startTime!,
+            endTime: callData.endTime!,
+            callId: callData.callId,
+            CallParticipant: {
+              createMany: {
+                data: callData.participants as any,
+              },
+            },
+          },
+        },
+        LastMessageFor: { connect: { chatRoomId: callData.chatRoomId } },
+      },
     });
   };
 }

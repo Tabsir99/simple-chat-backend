@@ -17,7 +17,7 @@ CREATE TYPE "MessageStatus" AS ENUM ('sent', 'delivered', 'seen', 'failed');
 CREATE TYPE "MessageType" AS ENUM ('user', 'system', 'call');
 
 -- CreateEnum
-CREATE TYPE "CallStatus" AS ENUM ('missed', 'connected', 'ended');
+CREATE TYPE "CallStatus" AS ENUM ('missed', 'ongoing', 'ended');
 
 -- CreateTable
 CREATE TABLE "User" (
@@ -67,16 +67,26 @@ CREATE TABLE "Message" (
 
 -- CreateTable
 CREATE TABLE "CallSession" (
-    "callId" TEXT NOT NULL,
+    "callId" UUID NOT NULL,
     "callerId" UUID NOT NULL,
-    "recipientId" UUID NOT NULL,
     "isVideoCall" BOOLEAN NOT NULL,
     "status" "CallStatus" NOT NULL,
     "messageId" UUID NOT NULL,
-    "startTime" TIMESTAMP(3),
-    "endTime" TIMESTAMP(3),
+    "chatRoomId" UUID NOT NULL,
+    "startTime" TIMESTAMP(3) NOT NULL,
+    "endTime" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "CallSession_pkey" PRIMARY KEY ("callId")
+);
+
+-- CreateTable
+CREATE TABLE "CallParticipant" (
+    "callId" UUID NOT NULL,
+    "userId" UUID NOT NULL,
+    "joinedAt" TIMESTAMP(3) NOT NULL,
+    "leftAt" TIMESTAMP(3),
+
+    CONSTRAINT "CallParticipant_pkey" PRIMARY KEY ("callId","userId")
 );
 
 -- CreateTable
@@ -248,10 +258,13 @@ ALTER TABLE "Message" ADD CONSTRAINT "Message_parentMessageId_fkey" FOREIGN KEY 
 ALTER TABLE "CallSession" ADD CONSTRAINT "CallSession_callerId_fkey" FOREIGN KEY ("callerId") REFERENCES "User"("userId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "CallSession" ADD CONSTRAINT "CallSession_recipientId_fkey" FOREIGN KEY ("recipientId") REFERENCES "User"("userId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "CallSession" ADD CONSTRAINT "CallSession_messageId_fkey" FOREIGN KEY ("messageId") REFERENCES "Message"("messageId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "CallSession" ADD CONSTRAINT "CallSession_messageId_fkey" FOREIGN KEY ("messageId") REFERENCES "Message"("messageId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "CallParticipant" ADD CONSTRAINT "CallParticipant_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("userId") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CallParticipant" ADD CONSTRAINT "CallParticipant_callId_fkey" FOREIGN KEY ("callId") REFERENCES "CallSession"("callId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Attachment" ADD CONSTRAINT "Attachment_messageId_fkey" FOREIGN KEY ("messageId") REFERENCES "Message"("messageId") ON DELETE CASCADE ON UPDATE CASCADE;
