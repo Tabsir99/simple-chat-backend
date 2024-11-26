@@ -8,7 +8,7 @@ import authRoute from "./modules/authentication/auth.routes";
 import userRoute from "./modules/users/user.routes";
 import friendRoute from "./modules/friendship/frnd.routes";
 import chatRoute from "./modules/chats/chat.routes";
-import { createServer } from "https";
+import { createServer } from "http";
 
 import { WebSocketManager } from "./common/websockets/websocket";
 import container from "./inversify/bindings";
@@ -18,12 +18,12 @@ import mediaRouter from "./modules/media/media.route";
 import { readFileSync } from "fs";
 
 
-const cert = readFileSync("./ssl/cert.pem")
-const key = readFileSync("./ssl/key.pem")
+// const cert = readFileSync("./ssl/cert.pem")
+// const key = readFileSync("./ssl/key.pem")
 
 process.env.TZ = "UTC"
 const app = express();
-const httpServer = createServer({cert: cert,key},app);
+const httpServer = createServer(app);
 
 const webSocketManager = container.get<WebSocketManager>(
   TYPES.WebSocketManager

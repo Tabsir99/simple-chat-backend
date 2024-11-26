@@ -43,7 +43,7 @@ export default class AuthService {
     return now;
   }
   private async handleUserLogin(
-    email: string,
+    email: string
   ): Promise<{ refreshToken: string }> {
     try {
       let userID = await this.userService.getUserId(email);
@@ -203,7 +203,7 @@ export default class AuthService {
       }
 
       const newAccessToken = await this.generateAccessToken(
-        { userId: oldToken.userId},
+        { userId: oldToken.userId },
         "30m",
         this.configService.get("jwtSecretAccess")
       );
@@ -225,7 +225,9 @@ export default class AuthService {
     } catch (error) {
       if (error instanceof AuthError) {
         if (error.errorCode === "TOKEN_EXPIRED") {
-          await this.authRepository.revokeToken(error.details?.oldTokenId as string);
+          await this.authRepository.revokeToken(
+            error.details?.oldTokenId as string
+          );
           throw error;
         }
       }
@@ -233,4 +235,15 @@ export default class AuthService {
     }
   };
 
+  revokeRefreshToken = async (oldToken: string) => {
+    try {
+      const res = await this.authRepository.getToken(this.hashToken(oldToken));
+      if (res) {
+        await this.authRepository.revokeFamily(res.tokenFamily.familyId);
+      }
+    } catch (error) {
+      console.error(error)
+      throw error
+    }
+  };
 }

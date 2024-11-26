@@ -15,10 +15,7 @@ export default class AuthController {
     @inject(TYPES.CookieManager) private cookieManager: ICookieManager
   ) {}
 
-  public redirectToGoogleAuth = (
-    _: Request,
-    res: Response,
-  ): void => {
+  public redirectToGoogleAuth = (_: Request, res: Response): void => {
     const redirectUri = encodeURIComponent(
       `${this.config.get("baseUrl")}/api/auth/google/callback`
     );
@@ -116,7 +113,7 @@ export default class AuthController {
     next: NextFunction
   ) => {
     const refreshToken: string = req.cookies["refreshToken"];
-    console.log(refreshToken)
+    console.log(refreshToken);
 
     try {
       const { newAccessToken, newRefreshToken } =
@@ -162,12 +159,17 @@ export default class AuthController {
 
   public logout = async (req: Request, res: Response, next: NextFunction) => {
     const refreshToken: string = req.cookies["refreshToken"];
+    console.log(refreshToken)
+    try {
+      await this.authService.revokeRefreshToken(refreshToken);
 
-    // await this.authService.revokeRefreshToken(refreshToken);
-    this.cookieManager.clearAuthCookies(res);
+      this.cookieManager.clearAuthCookies(res);
 
-    res.status(200).json({
-      message: "User logged out",
-    });
+      res.status(200).json({
+        message: "User logged out",
+      });
+    } catch (error) {
+      next(error);
+    }
   };
 }
