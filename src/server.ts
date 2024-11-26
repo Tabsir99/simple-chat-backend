@@ -15,10 +15,7 @@ import container from "./inversify/bindings";
 import { TYPES } from "./inversify/types";
 import messageRouter from "./modules/messages/message.routes";
 import mediaRouter from "./modules/media/media.route";
-import EventEmitter from "events";
 import { readFileSync } from "fs";
-import "./common/utils/cronJobs"
-import prisma from "./common/config/db";
 
 
 const cert = readFileSync("./ssl/cert.pem")
