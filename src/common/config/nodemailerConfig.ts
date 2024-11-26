@@ -15,13 +15,12 @@ export class EmailService implements IEmailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
-    // Setting up the transporter with your SMTP details (Mailgun, Gmail, or others)
     this.transporter = nodemailer.createTransport({
-      host: 'smtp.zoho.com',       // e.g., "smtp.mailgun.org"
-      port: 587,       // e.g., 587
+      host: 'smtp.zoho.com',      
+      port: 587,     
       auth: {
-        user: config.nodemailerUser,     // Your SMTP username
-        pass: config.nodemailerPass,     // Your SMTP password or API key
+        user: config.nodemailerUser,  
+        pass: config.nodemailerPass,     
       },
     });
     
@@ -29,10 +28,10 @@ export class EmailService implements IEmailService {
 
   async sendVerificationEmail(email: string, link: string): Promise<void> {
     const mailOptions: MailOptions = {
-      from: `TabsirCG Support <${config.nodemailerUser}>`,  // Sender address
-      to: email,                                          // Recipient email
-      subject: "Verify Your Email",                       // Email subject
-      html: verificationEmailTemplate(link, generateUsernameFromEmail(email)), // Email content (HTML template)
+      from: `TabsirCG Support <${config.nodemailerUser}>`, 
+      to: email,                                         
+      subject: "Verify Your Email",                      
+      html: verificationEmailTemplate(link, generateUsernameFromEmail(email)), 
     };
 
     try {

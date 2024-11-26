@@ -56,12 +56,6 @@ app.use("/api", friendRoute);
 app.use("/api", chatRoute);
 
 
-// Error-handling middleware
-
-// Error-handling middleware
-
-
-
 app.all("*", (req, res) => {
   res
     .json({
@@ -72,12 +66,12 @@ app.all("*", (req, res) => {
 });
 
 app.use((err: Error, _: Request, res: Response) => {
-  console.error(err.stack, "From Error middleware"); // Log error details (stack trace)
+  console.error(err.stack, "From Error middleware"); 
   
   res.status(500).json({
     success: false,
     message: "Internal server error",
-    error: err.message, // Send back error details (optional)
+    error: err.message,
   });
 });
 

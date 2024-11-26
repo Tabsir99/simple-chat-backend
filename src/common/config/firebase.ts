@@ -21,7 +21,7 @@ const bucket = storage.bucket();
 //   {
 //     origin: ["https://192.168.0.103:5000"],
 //     method: ["PUT", "GET"],
-//     responseHeader: ["Content-Type", "Access-Control-Allow-Origin"], // Add this
+//     responseHeader: ["Content-Type", "Access-Control-Allow-Origin"], 
 //     maxAgeSeconds: 604800,
 //   },
 // ]);
