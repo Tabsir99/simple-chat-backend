@@ -5,8 +5,7 @@ import { formatResponse } from "../utils/responseFormatter";
 
 export default async function authMiddleware(req: Request, res: Response, next: NextFunction) {
   
-    const authHeader = req.headers['authorization']; // Get the Authorization header
-    // console.log(req.path)
+    const authHeader = req.headers['authorization'];
     const token = authHeader?.split(' ')[1];
     
     if(!token){

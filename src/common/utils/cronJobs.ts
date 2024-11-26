@@ -17,8 +17,8 @@ const cleanUpWorker = new Worker(
   "cleanUpQueue",
   async (job) => {
     try {
-      console.log("Processing job:", job.name);
-      console.log("Job data:", job.data);
+      console.info("Processing job:", job.name);
+      console.info("Job data:", job.data);
 
       return { success: true };
     } catch (error) {
@@ -35,5 +35,5 @@ const cleanUpWorker = new Worker(
 );
 
 cleanUpWorker.on("completed", (ev) => {
-  console.log(ev.data);
+  console.info(ev.data);
 });

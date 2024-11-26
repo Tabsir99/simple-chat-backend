@@ -1,13 +1,8 @@
-import { IUserService } from "../users/user.service.interface";
+import { IUserService } from "../users/user.interface";
 import { IEmailService } from "../../common/config/nodemailerConfig";
 import { IConfigService } from "../../common/config/env";
 import { createHash, randomBytes } from "crypto";
 import { JWTVerifyResult, SignJWT, createRemoteJWKSet, jwtVerify } from "jose";
-import {
-  IAuthService,
-  AccessTokenData,
-  IAuthRepository,
-} from "./auth.service.interface";
 import { inject, injectable } from "inversify";
 import { TYPES } from "../../inversify/types";
 import AuthRepository from "./auth.repository";

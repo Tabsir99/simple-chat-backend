@@ -14,6 +14,8 @@ const userRoute = Router();
 
 userRoute.use(authMiddleware);
 userRoute.get("/users/me", userControllers.getOwnProfile);
+userRoute.put("/users/me", userControllers.updateUser);
+userRoute.put("/users/me/avatar",userControllers.makeUserAvatarPublic)
 userRoute.get("/users/:userId", userControllers.getUserInfo);
 userRoute.get(
   "/users",

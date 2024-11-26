@@ -3,7 +3,7 @@ import {
   MiniUserProfile,
   RawUserData,
   RecentActivities,
-} from "./user.service.interface";
+} from "./user.interface";
 import prisma from "../../common/config/db";
 import { injectable } from "inversify";
 import { randomInt } from "crypto";
@@ -28,11 +28,14 @@ export class UserRepository implements IUserRepository {
     username: string
   ): Promise<{ userId: string }> {
     try {
-      const defaultProfie = `https://storage.googleapis.com/simple-chat-cg.appspot.com/avatars/default/default${randomInt(1,6)}.svg`;
+      const defaultProfie = `https://storage.googleapis.com/simple-chat-cg.appspot.com/avatars/default/default${randomInt(
+        1,
+        6
+      )}.svg`;
 
       return await prisma.$transaction(async (tx) => {
         const userId = await tx.user.create({
-          data: { email, username,profilePicture: defaultProfie },
+          data: { email, username, profilePicture: defaultProfie },
           select: { userId: true },
         });
         await tx.recentActivity.create({
@@ -136,7 +139,7 @@ export class UserRepository implements IUserRepository {
     });
   }
   searchFriends = async (query: string, chatRoomId: string, userId: string) => {
-    const res = await prisma.$queryRaw<Omit<MiniUserProfile,"bio">[]>`
+    const res = await prisma.$queryRaw<Omit<MiniUserProfile, "bio">[]>`
       WITH eligible_friends AS (
           SELECT DISTINCT
               u."userId",
@@ -170,6 +173,29 @@ export class UserRepository implements IUserRepository {
 
     `;
 
-   return res
+    return res;
   };
+
+  async updateUser({
+    userId,
+    bio,
+    username,
+    profilePicture,
+  }: {
+    userId: string;
+    bio?: string | undefined;
+    username?: string | undefined;
+    profilePicture?: string | undefined;
+  }): Promise<any> {
+    return await prisma.user.update({
+      where: {
+        userId: userId,
+      },
+      data: {
+        ...(username && { username }),
+        ...(bio && { bio }),
+        ...(profilePicture && { profilePicture }),
+      },
+    });
+  }
 }

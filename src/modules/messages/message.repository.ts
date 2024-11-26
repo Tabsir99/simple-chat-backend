@@ -4,13 +4,14 @@ import {
   Attachment,
   FilterMessageOption,
   IMessage,
+  IMessageRepository,
   IRawMessage,
   MinifiedMessage,
 } from "./message.interface";
 import { $Enums, Prisma } from "@prisma/client";
 
 @injectable()
-export class MessageRepository {
+export class MessageRepository implements IMessageRepository {
   async findMessagesByChatId(
     chatId: string,
     currentUserId: string,
@@ -409,7 +410,6 @@ export class MessageRepository {
       chatClearedAt: Date | null;
     }
   ) => {
-    console.log(memberInfo); // queryis pre formatted using | operator
     const res = await prisma.$queryRaw<MinifiedMessage[]>`
     SELECT m."messageId",m."content",m."createdAt",u."username",u."profilePicture",
     ts_rank_cd(m.search_vector, to_tsquery('english',${query})) AS rank
@@ -431,18 +431,7 @@ export class MessageRepository {
     ORDER BY rank DESC
     `;
 
-    console.log(res);
     return res;
   };
 }
 
-/* 
-AND m."createdAt" > ${memberInfo.chatClearedAt}
-    ${
-      memberInfo.removedAt
-        ? Prisma.sql`AND m."createdAt" < ${memberInfo.removedAt}`
-        : Prisma.sql``
-    }
-    AND 
-
-*/

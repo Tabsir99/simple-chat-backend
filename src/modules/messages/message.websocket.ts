@@ -1,24 +1,18 @@
-import { Socket } from "socket.io";
 import { TYPES } from "../../inversify/types";
 import { inject, injectable } from "inversify";
-// import MessageService from "./message.services";
 import {
-  IConnectedUser,
   IConnectionEventHandler,
   WebsocketHandlerParams,
 } from "../../common/websockets/websocket";
-import { MessageService } from "./message.services";
-import { Attachment, IMessage } from "./message.interface";
+import { Attachment, IMessage, IMessageService } from "./message.interface";
 import { validReactionSet } from "../../common/utils/utils";
-import { MediaService } from "../media/media.services";
 
 @injectable()
 export default class MessageWebSocketHandler
   implements IConnectionEventHandler
 {
   constructor(
-    @inject(TYPES.MessageService) private messageService: MessageService,
-    @inject(TYPES.MediaService) private mediaService: MediaService
+    @inject(TYPES.MessageService) private messageService: IMessageService,
   ) {}
 
   async handle({
@@ -239,11 +233,9 @@ export default class MessageWebSocketHandler
         chatRoomId: string;
         messageId: string;
       }) => {
-        console.log("Hello from emssage delete")
 
         if (!socket.rooms.has(chatRoomId)) return;
 
-        console.log("Hello from emssage delete")
         this.messageService.updateMessage(messageId);
         socket.to(chatRoomId).emit("messageEvent", {
           event: "message:delete",

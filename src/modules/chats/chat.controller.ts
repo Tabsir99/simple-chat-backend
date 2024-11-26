@@ -1,16 +1,15 @@
 import { NextFunction, Request, Response } from "express";
 import { inject, injectable } from "inversify";
 import { TYPES } from "../../inversify/types";
-import ChatServices from "./chat.services";
 import { formatResponse } from "../../common/utils/responseFormatter";
-import { WebSocketManager } from "../../common/websockets/websocket";
 import { EventManager } from "../../common/config/eventService";
 import { ChatError } from "../../common/errors/chatErrors";
+import { IChatServices } from "./chats.interfaces";
 
 @injectable()
 export default class ChatControllers {
   constructor(
-    @inject(TYPES.ChatService) private chatServices: ChatServices,
+    @inject(TYPES.ChatService) private chatServices: IChatServices,
     @inject(TYPES.EventManager) private eventManager: EventManager
   ) {}
 
@@ -47,7 +46,11 @@ export default class ChatControllers {
 
   getGroupMedia = async (req: Request, res: Response) => {
     const chatRoomId = req.params.chatId as string;
+    const includeUrl = req.query.url
+
     const result = await this.chatServices.getChatRoomMedia(chatRoomId);
+
+
     res.json(
       formatResponse({
         success: true,
@@ -336,7 +339,7 @@ export default class ChatControllers {
       );
     } catch (error) {
       if (error instanceof ChatError) {
-        console.log(error.errorCode, error.statusCode);
+        console.error(error.errorCode, error.statusCode);
         if (error.errorCode === "MEMBER_ALREADY_EXISTS") {
           return res.status(400).json(
             formatResponse({

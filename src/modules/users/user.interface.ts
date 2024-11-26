@@ -56,6 +56,13 @@ export interface IUserService {
     userId: string,
     event: "reset-friends" | "reset-chats"
   ): Promise<any>;
+  updateUser(
+    userId: string,
+    username?: string,
+    bio?: string,
+    image?: { imageSize: number; imageName: string; imageType: string }
+  ): Promise<any>;
+  makeUserAvatarPublic(userId: string, fileName: string): Promise<void>;
 }
 
 // user.repository.interface.ts
@@ -77,5 +84,16 @@ export interface IUserRepository {
     query: string,
     chatRoomId: string,
     userId: string
-  ): Promise<Omit<MiniUserProfile,"bio">[]>;
+  ): Promise<Omit<MiniUserProfile, "bio">[]>;
+  updateUser({
+    userId,
+    bio,
+    username,
+    profilePicture,
+  }: {
+    userId: string;
+    bio?: string;
+    username?: string;
+    profilePicture?: string;
+  }): Promise<any>;
 }

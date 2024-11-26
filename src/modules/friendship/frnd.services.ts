@@ -1,15 +1,15 @@
 import { inject, injectable } from "inversify";
-import FriendshipRepository from "./frnd.repository";
 import { TYPES } from "../../inversify/types";
 import { $Enums, FriendshipStatus } from "@prisma/client";
 import redisClient from "../../common/config/redisConfig";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { IFriendshipRepository, IFriendshipService } from "./frnd.interface";
 
 @injectable()
-export default class FriendshipService {
+export default class FriendshipService implements IFriendshipService {
   constructor(
     @inject(TYPES.FriendshipRepository)
-    private friendshipRepository: FriendshipRepository,
+    private friendshipRepository: IFriendshipRepository,
   ) {}
 
   // Method to get the friendship status between two users

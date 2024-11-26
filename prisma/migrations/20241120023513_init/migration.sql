@@ -8,7 +8,7 @@ CREATE TYPE "FriendshipStatus" AS ENUM ('pending', 'accepted', 'blocked', 'cance
 CREATE TYPE "ChatRole" AS ENUM ('member', 'admin');
 
 -- CreateEnum
-CREATE TYPE "FileType" AS ENUM ('IMAGE_JPEG', 'IMAGE_PNG', 'IMAGE_GIF', 'IMAGE_WEBP', 'IMAGE_SVG', 'PDF', 'DOC', 'DOCX', 'XLS', 'XLSX', 'TXT', 'HTML', 'CSS', 'CSV', 'AUDIO_MP3', 'AUDIO_WAV', 'AUDIO_M4A', 'VIDEO_MP4', 'VIDEO_WEBM', 'ZIP', 'RAR', 'OTHER');
+CREATE TYPE "FileType" AS ENUM ('IMAGE_JPEG', 'IMAGE_PNG', 'IMAGE_GIF', 'IMAGE_WEBP', 'IMAGE_SVG', 'PDF', 'DOC', 'DOCX', 'XLS', 'XLSX', 'TXT', 'HTML', 'CSS', 'CSV', 'AUDIO_MP3', 'AUDIO_WAV', 'AUDIO_M4A', 'AUDIO_WEBM', 'VIDEO_MP4', 'VIDEO_WEBM', 'ZIP', 'RAR', 'OTHER');
 
 -- CreateEnum
 CREATE TYPE "MessageStatus" AS ENUM ('sent', 'delivered', 'seen', 'failed');

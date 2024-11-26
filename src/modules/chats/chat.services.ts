@@ -1,18 +1,20 @@
 import { inject, injectable } from "inversify";
 import { TYPES } from "../../inversify/types";
-import ChatRepository from "./chat.repository";
 import { getMimeType } from "../../common/utils/utils";
-import { $Enums, ChatRole, FileType } from "@prisma/client";
-import FriendshipService from "../friendship/frnd.services";
-import { CallData, ChatRoomHead } from "./chats.interfaces";
+import { FileType } from "@prisma/client";
+import {
+  CallData,
+  ChatRoomHead,
+  IChatRepository,
+  IChatServices,
+} from "./chats.interfaces";
 import { ChatError } from "../../common/errors/chatErrors";
 import { MediaService } from "../media/media.services";
-import { randomUUID } from "crypto";
 
 @injectable()
-export default class ChatServices {
+export default class ChatServices implements IChatServices {
   constructor(
-    @inject(TYPES.ChatRepository) private chatRepository: ChatRepository,
+    @inject(TYPES.ChatRepository) private chatRepository: IChatRepository,
     @inject(TYPES.MediaService) private mediaService: MediaService
   ) {}
 
@@ -287,9 +289,8 @@ export default class ChatServices {
   createCallMessage = async (callData: CallData) => {
     try {
       const res = await this.chatRepository.createCallMessage(callData);
-      console.log("craeted message,",res)
     } catch (error) {
-      console.log("error occurd",error)
+      console.error("error occurd", error);
     }
   };
 }

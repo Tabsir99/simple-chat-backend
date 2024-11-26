@@ -1,7 +1,6 @@
 import { DefaultEventsMap, Socket } from "socket.io";
 import { TYPES } from "../../inversify/types";
 import { inject, injectable } from "inversify";
-import ChatServices from "./chat.services";
 import {
   IConnectionEventHandler,
   WebsocketHandlerParams,
@@ -9,7 +8,7 @@ import {
 import { MediaService } from "../media/media.services";
 
 import { randomUUID } from "crypto";
-import { CallData } from "./chats.interfaces";
+import { CallData, IChatServices } from "./chats.interfaces";
 
 export type TypingEventData = {
   chatRoomId: string;
@@ -19,17 +18,12 @@ export type TypingEventData = {
   userId: string;
 };
 
-type MembershipUpdate = {
-  userId: string;
-  chatRoomId: string;
-};
-
 @injectable()
 export default class ChatWebSocketHandler implements IConnectionEventHandler {
   private activeCalls: Map<string, CallData> = new Map();
 
   constructor(
-    @inject(TYPES.ChatService) private chatService: ChatServices,
+    @inject(TYPES.ChatService) private chatService: IChatServices,
     @inject(TYPES.MediaService) private mediaService: MediaService
   ) {}
 
@@ -157,7 +151,7 @@ export default class ChatWebSocketHandler implements IConnectionEventHandler {
 
           socket.to(to).emit("messageEvent", newCallEvent);
           socket.emit("messageEvent", newCallEvent);
-          this.chatService.createCallMessage(newCallData);
+          await this.chatService.createCallMessage(newCallData);
         }
       }
     );
@@ -206,7 +200,8 @@ export default class ChatWebSocketHandler implements IConnectionEventHandler {
     socket.on(
       "call-connected",
       ({ callId, to }: { to: string; callId: string }) => {
-        const targetCall = this.activeCalls.get(to);
+        const targetCall = this.activeCalls.get(callId);
+
         if (targetCall) {
           const updatedCall: CallData = {
             ...targetCall,
@@ -232,7 +227,6 @@ export default class ChatWebSocketHandler implements IConnectionEventHandler {
       async ({ callId, to }: { to: string; callId: string }) => {
         if (!socket.rooms.has(to)) return;
 
-        console.log("hello sucker", to);
         socket.to(to).emit("callEvent", {
           event: "call:ended",
           data: {
@@ -248,7 +242,29 @@ export default class ChatWebSocketHandler implements IConnectionEventHandler {
             status: "ended",
             endTime: new Date(),
           };
-          this.chatService.createCallMessage(updatedCall);
+
+          const newCallEvent = {
+            event: "message:new",
+            data: {
+              chatRoomId: to,
+              message: {
+                messageId: updatedCall.messageId,
+                createdAt: new Date(),
+                type: "call",
+                callInformation: {
+                  callerId: updatedCall.callerId,
+                  startTime: updatedCall.startTime,
+                  endTime: updatedCall.endTime,
+                  status: updatedCall.status,
+                  isVideoCall: updatedCall.isVideoCall,
+                },
+              },
+            },
+          };
+
+          socket.to(to).emit("messageEvent", newCallEvent);
+          socket.emit("messageEvent", newCallEvent);
+          await this.chatService.createCallMessage(updatedCall);
         }
       }
     );

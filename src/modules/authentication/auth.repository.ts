@@ -1,5 +1,4 @@
-import redisClient from "../../common/config/redisConfig";
-import { IAuthRepository } from "./auth.service.interface";
+
 import { injectable } from "inversify";
 import prisma from "../../common/config/db";
 

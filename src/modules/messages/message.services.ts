@@ -5,17 +5,14 @@ import {
   Attachment,
   FilterMessageOption,
   IMessage,
+  IMessageService,
   IRawMessage,
 } from "./message.interface";
 import { $Enums, FileType } from "@prisma/client";
-import {
-  getExtensionFromMimeType,
-  getFileTypeFromMimeType,
-  getMimeType,
-} from "../../common/utils/utils";
+import { getFileTypeFromMimeType, getMimeType } from "../../common/utils/utils";
 import { MediaService } from "../media/media.services";
-import ChatServices from "../chats/chat.services";
 import { MessageError } from "../../common/errors/messageErrors";
+import { IChatServices } from "../chats/chats.interfaces";
 
 type Reactions = {
   emoji: string;
@@ -23,12 +20,12 @@ type Reactions = {
 }[];
 
 @injectable()
-export class MessageService {
+export class MessageService implements IMessageService {
   constructor(
     @inject(TYPES.MessageRepository)
     private messageRepository: MessageRepository,
     @inject(TYPES.MediaService) private mediaService: MediaService,
-    @inject(TYPES.ChatService) private chatService: ChatServices
+    @inject(TYPES.ChatService) private chatService: IChatServices
   ) {}
 
   async getMessagesByChatId(
@@ -203,7 +200,7 @@ export class MessageService {
 
       return queryResult;
     } catch (error) {
-      console.log(error);
+      console.error(error);
       throw new Error("Error occured");
     }
   };

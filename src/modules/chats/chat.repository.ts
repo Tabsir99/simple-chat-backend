@@ -1,12 +1,12 @@
 import { injectable } from "inversify";
 import prisma from "../../common/config/db";
 import { randomUUID } from "crypto";
-import { CallData, ChatRoomHead } from "./chats.interfaces";
+import { CallData, ChatRoomHead, IChatRepository } from "./chats.interfaces";
 import { Prisma } from "@prisma/client";
 import { ChatError } from "../../common/errors/chatErrors";
 
 @injectable()
-export default class ChatRepository {
+export default class ChatRepository implements IChatRepository {
   findChatsByUserId = async (userId: string) => {
     const res = await prisma.$queryRaw<ChatRoomHead[]>`
           WITH LastMessages AS (
@@ -524,7 +524,7 @@ export default class ChatRepository {
   };
 
   createCallMessage = async (callData: CallData) => {
-    return await prisma.message.create({
+    await prisma.message.create({
       data: {
         content: "",
         chatRoomId: callData.chatRoomId,
@@ -547,6 +547,9 @@ export default class ChatRepository {
           },
         },
         LastMessageFor: { connect: { chatRoomId: callData.chatRoomId } },
+      },
+      select: {
+        messageId: true,
       },
     });
   };

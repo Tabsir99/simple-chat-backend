@@ -1,14 +1,14 @@
 import { NextFunction, Request, Response } from "express";
 import { inject, injectable } from "inversify";
-import { MessageService } from "./message.services";
 import { TYPES } from "../../inversify/types";
 import { formatResponse } from "../../common/utils/responseFormatter";
 import { MessageError } from "../../common/errors/messageErrors";
+import { IMessageService } from "./message.interface";
 
 @injectable()
 export default class MessageControllers {
   constructor(
-    @inject(TYPES.MessageService) private messageService: MessageService
+    @inject(TYPES.MessageService) private messageService: IMessageService
   ) {}
   // Retrieve all messages in a specific chat
   getMessagesByChatId = async (

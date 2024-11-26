@@ -2,9 +2,10 @@ import { injectable } from "inversify";
 import prisma from "../../common/config/db";
 import { Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
+import { IFriendshipRepository } from "./frnd.interface";
 
 @injectable()
-export default class FriendshipRepository {
+export default class FriendshipRepository implements IFriendshipRepository {
   findFriendshipStatusByUsers = async (
     userId: string,
     targetUserId: string

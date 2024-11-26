@@ -7,16 +7,15 @@ import {
   IConnectionEventHandler,
   WebsocketHandlerParams,
 } from "../../common/websockets/websocket";
-import FriendshipService from "../friendship/frnd.services";
 import { EventManager } from "../../common/config/eventService";
+import { IFriendshipService } from "../friendship/frnd.interface";
 
 @injectable()
 export default class UserWebSocketHandler implements IConnectionEventHandler {
   constructor(
     @inject(TYPES.UserService) private userService: UserService,
     @inject(TYPES.FriendshipService)
-    private friendshipService: FriendshipService,
-    @inject(TYPES.EventManager) private eventManager: EventManager
+    private friendshipService: IFriendshipService,
   ) {}
 
   async handle({
@@ -40,7 +39,6 @@ export default class UserWebSocketHandler implements IConnectionEventHandler {
         }
       });
     }
-
 
     socket.on(
       "activity:reset",

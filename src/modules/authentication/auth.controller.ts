@@ -116,6 +116,7 @@ export default class AuthController {
     next: NextFunction
   ) => {
     const refreshToken: string = req.cookies["refreshToken"];
+    console.log(refreshToken)
 
     try {
       const { newAccessToken, newRefreshToken } =

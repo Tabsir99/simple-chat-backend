@@ -1,17 +1,17 @@
 import { inject, injectable } from "inversify";
 import { TYPES } from "../../inversify/types";
-import FriendshipService from "./frnd.services";
 import { Request, Response } from "express";
 import { formatResponse } from "../../common/utils/responseFormatter";
 import { WebSocketManager } from "../../common/websockets/websocket";
 import { EventManager } from "../../common/config/eventService";
 import { $Enums } from "@prisma/client";
+import { IFriendshipService } from "./frnd.interface";
 
 @injectable()
 export default class FriendshipController {
   constructor(
     @inject(TYPES.FriendshipService)
-    private friendshipService: FriendshipService,
+    private friendshipService: IFriendshipService,
     @inject(TYPES.WebSocketManager) private webSocketManager: WebSocketManager,
     @inject(TYPES.EventManager) private eventManager: EventManager
   ) {}

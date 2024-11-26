@@ -7,11 +7,11 @@ export const generateUsernameFromEmail = (email: string): string => {
 
 export const escapeHtml = (unsafeText: string) => {
   return unsafeText
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 };
 export async function getGoogleJWKs() {
   const response = await fetch("https://www.googleapis.com/oauth2/v3/certs");
@@ -83,6 +83,7 @@ const mimeTypeMap: Record<$Enums.FileType, string> = {
   AUDIO_MP3: "audio/mpeg",
   AUDIO_WAV: "audio/wav",
   AUDIO_M4A: "audio/m4a",
+  AUDIO_WEBM: "audio/webm",
 
   // Video
   VIDEO_MP4: "video/mp4",
@@ -123,7 +124,7 @@ const reverseMimeTypeMap: Record<string, $Enums.FileType> = {
   "audio/mpeg": "AUDIO_MP3",
   "audio/wav": "AUDIO_WAV",
   "audio/m4a": "AUDIO_M4A",
-
+  "audio/webm": "AUDIO_WEBM",
   // Video
   "video/mp4": "VIDEO_MP4",
   "video/webm": "VIDEO_WEBM",
@@ -157,6 +158,7 @@ const mimeTypeToExtension: Record<string, string> = {
   "text/csv": "csv",
   "audio/mpeg": "mp3",
   "audio/wav": "wav",
+  "audio/webm": "webm",
   "audio/m4a": "m4a",
   "video/mp4": "mp4",
   "video/webm": "webm",

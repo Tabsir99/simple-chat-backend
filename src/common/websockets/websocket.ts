@@ -49,15 +49,12 @@ export class WebSocketManager {
     private userHandler: IConnectionEventHandler,
     @inject(TYPES.MessageWebSocketHandler)
     private messageHandler: IConnectionEventHandler,
-    @inject(TYPES.NotificationWebSocketHandler)
-    private notificationHandler: IConnectionEventHandler,
     @inject(TYPES.EventManager) private eventManager: EventManager
   ) {
     this.connectionEventHandlers = [
       this.chatHandler,
       this.userHandler,
       this.messageHandler,
-      this.notificationHandler,
     ];
   }
 
@@ -85,7 +82,6 @@ export class WebSocketManager {
         return next(new Error("No Token provided"));
       }
       try {
-        console.log("websocket middleware running, token provided\n", token);
         const payload = await jwtVerify(
           token,
           new TextEncoder().encode(config.jwtSecretAccess)
@@ -93,10 +89,13 @@ export class WebSocketManager {
         const userId = payload.payload.userId as string;
 
         const expiryDate = new Date((payload.payload.exp as number) * 1000);
-        console.log("Token expires at:", expiryDate.toLocaleString("en-US",{
-          timeZone: "Asia/Dhaka"
-        }));
-        
+        // console.info(
+        //   "Token expires at:",
+        //   expiryDate.toLocaleString("en-US", {
+        //     timeZone: "Asia/Dhaka",
+        //   })
+        // );
+
         socket.userId = userId;
       } catch (error) {
         console.error(
