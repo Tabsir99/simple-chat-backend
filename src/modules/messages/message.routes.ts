@@ -1,25 +1,14 @@
 import { Router } from "express";
-import container from "../../inversify/bindings";
-import { TYPES } from "../../inversify/types";
-import MessageControllers from "./message.controller";
 import authMiddleware from "../../common/middlewares/authMiddleware";
-
-const messageControllers = container.get<MessageControllers>(
-  TYPES.MessageController
-);
+import * as messageController from "./message.controller";
 
 const messageRouter = Router();
 messageRouter.use(authMiddleware);
 
 messageRouter.get(
   "/chats/:chatId/messages",
-  messageControllers.getMessagesByChatId
+  messageController.getMessagesByChatId
 );
-messageRouter.post(
-  "/chats/:chatId/messages",
-  messageControllers.createMessageInChat
-);
-
-messageRouter.get("/messages", messageControllers.searchMessages);
+messageRouter.get("/messages", messageController.searchMessages);
 
 export default messageRouter;

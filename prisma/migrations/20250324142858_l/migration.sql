@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "ChatRoomMember" ALTER COLUMN "lastReadMessageId" DROP NOT NULL,
+ALTER COLUMN "readAt" DROP NOT NULL,
+ALTER COLUMN "readAt" DROP DEFAULT;

@@ -21,7 +21,7 @@ export class AuthError extends Error {
     public readonly details?: Record<string, any>
   ) {
     super(message);
-    this.name = 'AuthError';
+    this.name = "AuthError";
     Error.captureStackTrace(this, this.constructor);
   }
 

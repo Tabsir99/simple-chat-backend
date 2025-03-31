@@ -15,7 +15,7 @@ export class MessageError extends Error {
     public readonly details?: Record<string, any>
   ) {
     super(message);
-    this.name = 'MessageError';
+    this.name = "MessageError";
     Error.captureStackTrace(this, this.constructor);
   }
 

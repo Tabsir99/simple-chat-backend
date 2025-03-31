@@ -1,296 +1,231 @@
-import { inject, injectable } from "inversify";
-import { TYPES } from "../../inversify/types";
-import { getMimeType } from "../../common/utils/utils";
-import { FileType } from "@prisma/client";
-import {
-  CallData,
-  ChatRoomHead,
-  IChatRepository,
-  IChatServices,
-} from "./chats.interfaces";
+import { UserStatus } from "@prisma/client";
 import { ChatError } from "../../common/errors/chatErrors";
-import { MediaService } from "../media/media.services";
+import { CallData, ChatRoomHead } from "./chat.interface";
+import * as chatRepository from "./chat.repository";
 
-@injectable()
-export default class ChatServices implements IChatServices {
-  constructor(
-    @inject(TYPES.ChatRepository) private chatRepository: IChatRepository,
-    @inject(TYPES.MediaService) private mediaService: MediaService
-  ) {}
+export const getChats = async (userId: string) => {
+  try {
+    const chats = await chatRepository.findChatsByUserId(userId);
+    const refinedChats: ChatRoomHead[] = chats
+      .map((chat) => {
+        const otherMember = chat.chatRoom.ChatRoomMember[0];
+        const lastMessageReadBy = chat.chatRoom.ChatRoomMember.filter(
+          (m) => m.readAt && m.readAt >= chat.chatRoom.lastMessage!.createdAt
+        ).sort((a, b) => a.readAt!.getTime() - b.readAt!.getTime());
 
-  getChats = async (userId: string) => {
-    try {
-      const chats = await this.chatRepository.findChatsByUserId(userId);
-      const refinedChats: ChatRoomHead[] = chats
-        .map((room) => {
-          const isChatCleared =
-            room.chatClearedAt && room.chatClearedAt > room.lastActivity;
-
-          return {
-            ...room,
-            unreadCount: room.removedAt || isChatCleared ? 0 : room.unreadCount,
-            lastActivity: room.removedAt ? room.removedAt : room.lastActivity,
-            messageContent: isChatCleared ? null : room.messageContent,
-            fileType: isChatCleared
-              ? null
-              : getMimeType(room.fileType as FileType),
-          };
-        })
-        .sort(
-          (a, b) =>
-            new Date(b.lastActivity).getTime() -
-            new Date(a.lastActivity).getTime()
-        );
-      return refinedChats;
-    } catch (error) {
-      console.error(error);
-      throw new Error("Failed to get all chats");
-    }
-  };
-
-  createChatRoom = async (
-    currentUserId: string,
-    users: { userId: string; username: string }[],
-    groupName: string
-  ) => {
-    try {
-      const newUsers = users.map((user) => {
+        const roomStatus: UserStatus = chat.chatRoom.isGroup
+          ? chat.chatRoom.ChatRoomMember.some(
+              (m) => m.user.userStatus === "online"
+            )
+            ? "online"
+            : "invisible"
+          : otherMember.user.userStatus;
         return {
-          ...user,
-          isCreator: user.userId === currentUserId,
+          chatRoomId: chat.chatRoomId,
+          roomName: chat.chatRoom.roomName || otherMember.nickName,
+          roomImage: chat.chatRoom.roomImage || otherMember.user.profilePicture,
+          roomStatus: roomStatus,
+          unreadCount: chat.unreadCount,
+          isGroup: chat.chatRoom.isGroup,
+          chatClearedAt: chat.chatClearedAt,
+
+          joinedAt: chat.joinedAt,
+          removedAt: chat.removedAt,
+          lastMessageReadBy: lastMessageReadBy.map((m) => {
+            return m.user;
+          }),
+          lastMessage: chat.chatRoom.lastMessage
+            ? {
+                ...chat.chatRoom.lastMessage,
+                senderUsername: otherMember.nickName,
+              }
+            : null,
         };
-      });
-
-      const result = await this.chatRepository.createChat(newUsers, groupName);
-
-      return { ...result };
-    } catch (error) {
-      console.error(
-        error instanceof Error
-          ? error.message
-          : "error occured from createChatRom"
+      })
+      .sort(
+        (a, b) =>
+          new Date(b.lastMessage?.createdAt!).getTime() -
+          new Date(a.lastMessage?.createdAt!).getTime()
       );
-      throw new Error("Could not create a chatRoom");
-    }
-  };
+    return refinedChats;
+  } catch (error) {
+    console.error(error);
+    throw new Error("Failed to get all chats");
+  }
+};
 
-  getChatRoomMembers = async (chatRoomId: string) => {
-    const members = await this.chatRepository.getChatRoomMembers(chatRoomId);
+export const createChatRoom = async (
+  currentUserId: string,
+  users: { userId: string; username: string }[],
+  groupName: string
+) => {
+  try {
+    const result = await chatRepository.createChat(
+      currentUserId,
+      users,
+      groupName
+    );
 
-    const modifiedMembers = members?.ChatRoomMember.filter(
-      (m) => m.removedAt === null
-    ).map((member) => {
-      return {
-        ...member.user,
-        isCreator: member.user.userId === members.createdBy,
-        nickName: member.nickName,
-        isAdmin: member.userRole === "admin",
-        removedAt: member.removedAt,
-      };
+    return { ...result };
+  } catch (error) {
+    console.error(
+      error instanceof Error
+        ? error.message
+        : "error occured from createChatRom"
+    );
+    throw new Error("Could not create a chatRoom");
+  }
+};
+
+export const getChatRoomMembers = async (
+  chatRoomId: string,
+  userId: string
+) => {
+  const members = await chatRepository.getChatRoomMembers(chatRoomId, userId);
+
+  if (!members)
+    throw new Error("ChatRoom does not exist or you are not a member", {
+      cause: 400,
     });
 
-    return modifiedMembers;
-  };
-
-  getChatRoomMedia = async (chatRoomId: string) => {
-    const media = await this.chatRepository.getChatRoomMedia(chatRoomId);
-    const modifiedMedia = media?.Messages.map((msg) => {
-      return {
-        fileName: msg.Attachment[0].fileName,
-        fileType: msg.Attachment[0].fileType,
-        fileSize: msg.Attachment[0].fileSize,
-      };
-    });
-
-    return modifiedMedia;
-  };
-  getChatRoomList = async (userId: string) => {
-    const chatRoomList = await this.chatRepository.getChatRoomListByUserId(
-      userId
-    );
-    return chatRoomList.map((chatRoom) => chatRoom.chatRoomId);
-  };
-
-  updateGroupMember = async (
-    chatRoomId: string,
-    userId: string,
-    action: "promote" | "demote" | "nickname",
-    currentUserId: string,
-    username: string,
-    nickname?: string
-  ) => {
-    let res: { messageId: string; content: string; createdAt: Date };
-
-    const currentUser = await this.verifyUserPermission(
-      currentUserId,
-      chatRoomId
-    );
-
-    if (action === "nickname") {
-      res = await this.chatRepository.updateGroupMember(
-        chatRoomId,
-        userId,
-        currentUserId === userId ? "his" : `${username}'s`,
-        nickname as string,
-        currentUser.username
-      );
-      return res;
-    }
-
-    if (!currentUser.isAdmin) throw new Error("Not enough permission");
-
-    res = await this.chatRepository.updateGroupMemberRole(
-      chatRoomId,
-      userId,
-      action === "demote" ? "member" : "admin",
-      username,
-      currentUser.username
-    );
-
-    return res;
-  };
-
-  updateGroupMembership = async (
-    chatRoomId: string,
-    userId: string,
-    currentUserId: string,
-    username: string
-  ) => {
-    try {
-      const currentUser = await this.verifyUserPermission(
-        currentUserId,
-        chatRoomId
-      );
-      if (!currentUser.isAdmin) {
-        throw new Error("Not enough permission");
-      }
-      const res = await this.chatRepository.deleteGroupMember(
-        chatRoomId,
-        userId,
-        currentUserId,
-        username,
-        currentUser.username
-      );
-
-      return res;
-    } catch (error) {
-      return false;
-    }
-  };
-
-  validateMember = async (userId: string, chatRoomId: string) => {
-    const res = await this.chatRepository.findChatRoom(userId, chatRoomId);
-    if (!res || res.removedAt) throw ChatError.memberAccessDenied();
-    return res;
-  };
-
-  clearChat = async (chatRoomId: string, userId: string) => {
-    try {
-      const res = await this.chatRepository.clearChat(chatRoomId, userId);
-      return res;
-    } catch (error) {
-      return false;
-    }
-  };
-
-  addMember = async (
-    data: { chatRoomId: string; users: { userId: string; username: string }[] },
-    currentUserId: string
-  ) => {
-    const currentUser = await this.verifyUserPermission(
-      currentUserId,
-      data.chatRoomId
-    );
-    const res = await this.chatRepository.addGroupMember(
-      data,
-      currentUser.username
-    );
-    return res;
-  };
-
-  verifyUserPermission = async (userId: string, chatRoomId: string) => {
-    const res = await this.chatRepository.findUserPermission(
-      userId,
-      chatRoomId
-    );
-    if (!res) throw new Error("ChatRoomMember does not exists");
-
-    if (res.removedAt) throw new Error("User is no longer in the chatroom");
-
+  const modifiedMembers = members?.ChatRoomMember.filter(
+    (m) => m.removedAt === null
+  ).map((member) => {
     return {
-      isAdmin: res.userRole === "admin" ? true : false,
-      username: res.user.username,
+      ...member.user,
+      isCreator: member.user.userId === members.createdBy,
+      nickName: member.nickName,
+      isAdmin: member.userRole === "admin",
+      removedAt: member.removedAt,
     };
-  };
+  });
 
-  leaveGroup = async (userId: string, chatRoomId: string, username: string) => {
-    const res = await this.chatRepository.deleteGroupMember(
+  return modifiedMembers;
+};
+
+export const getChatRoomList = async (userId: string) => {
+  const chatRoomList = await chatRepository.getChatRoomListByUserId(userId);
+  return chatRoomList.map((chatRoom) => chatRoom.chatRoomId);
+};
+
+export const updateGroupMember = async (
+  chatRoomId: string,
+  userId: string,
+  action: "promote" | "demote" | "nickname",
+  currentUserId: string,
+  username: string,
+  nickname?: string
+) => {
+  let res: { messageId: string; content: string; createdAt: Date };
+
+  const currentUser = await verifyUserPermission(currentUserId, chatRoomId);
+
+  if (action === "nickname") {
+    const message = `${currentUser.username} changed ${
+      currentUserId === userId ? "his" : `${username}'s`
+    } nickname to '${nickname}'`;
+
+    res = await chatRepository.updateGroupMember(
       chatRoomId,
       userId,
-      userId,
-      username,
-      username
+      message,
+      nickname as string,
+      currentUser.username
     );
     return res;
-  };
+  }
 
-  updateChat = async (
-    currentUserId: string,
-    chatRoomId: string,
-    data: {
-      roomName?: string;
-      imageName: string;
-      size: number;
-      imageType: string;
-      type: "name" | "image";
+  if (!currentUser.isAdmin) throw new Error("Not enough permission");
+
+  const message = `${currentUser.username} has ${
+    action === "demote" ? "removed" : "promoted"
+  } ${username} ${action === "demote" ? "from admin role" : "to admin"} `;
+
+  res = await chatRepository.updateGroupMemberRole(
+    chatRoomId,
+    userId,
+    action === "demote" ? "member" : "admin",
+    message
+  );
+
+  return res;
+};
+
+export const updateGroupMembership = async (
+  chatRoomId: string,
+  userId: string,
+  currentUserId: string,
+  username: string
+) => {
+  try {
+    const currentUser = await verifyUserPermission(currentUserId, chatRoomId);
+    if (!currentUser.isAdmin) {
+      throw new Error("Not enough permission");
     }
-  ) => {
-    try {
-      const { username } = await this.verifyUserPermission(
-        currentUserId,
-        chatRoomId
-      );
 
-      if (data.type === "name") {
-        const msg = await this.chatRepository.updateChat(
-          chatRoomId,
-          `${username} changed group name to ${data.roomName}`,
-          data.roomName as string
-        );
+    const willLeaveGroup = userId === currentUserId;
+    const messageContent = `${currentUser.username} ${
+      willLeaveGroup ? "left" : "removed"
+    } ${willLeaveGroup ? "" : username + " from "}the group`;
 
-        return msg;
-      } else {
-        const signedUrl = await this.mediaService.getWriteSignedUrl(
-          `avatars/chatRoom/${chatRoomId}`,
-          { contentSize: data.size, contentType: data.imageType }
-        );
-        return signedUrl;
-      }
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  updateChatRoomImage = async (chatRoomId: string, currentUserId: string) => {
-    const isUserValid = await this.verifyUserPermission(
-      currentUserId,
-      chatRoomId
-    );
-    const res = await this.chatRepository.updateChat(
+    const res = await chatRepository.deleteGroupMember(
       chatRoomId,
-      `${isUserValid.username} updated the group avatar`,
-      undefined,
-      `https://storage.googleapis.com/simple-chat-cg.appspot.com/avatars/chatRoom/${chatRoomId}`
+      userId,
+      messageContent
     );
 
     return res;
-  };
+  } catch (error) {
+    return false;
+  }
+};
 
-  createCallMessage = async (callData: CallData) => {
-    try {
-      const res = await this.chatRepository.createCallMessage(callData);
-    } catch (error) {
-      console.error("error occurd", error);
-    }
+export const validateMember = async (userId: string, chatRoomId: string) => {
+  const res = await chatRepository.findChatRoom(userId, chatRoomId);
+  if (!res || res.removedAt) throw ChatError.memberAccessDenied();
+  return res;
+};
+
+export const clearChat = async (chatRoomId: string, userId: string) => {
+  try {
+    const res = await chatRepository.clearChat(chatRoomId, userId);
+    return res;
+  } catch (error) {
+    return false;
+  }
+};
+
+export const addMember = async (
+  data: { chatRoomId: string; users: { userId: string; username: string }[] },
+  currentUserId: string
+) => {
+  const currentUser = await verifyUserPermission(
+    currentUserId,
+    data.chatRoomId
+  );
+  const res = await chatRepository.addGroupMember(data, currentUser.username);
+  return res;
+};
+
+export const verifyUserPermission = async (
+  userId: string,
+  chatRoomId: string
+) => {
+  const res = await chatRepository.findUserPermission(userId, chatRoomId);
+  if (!res) throw new Error("ChatRoomMember does not exists");
+
+  if (res.removedAt) throw new Error("User is no longer in the chatroom");
+
+  return {
+    isAdmin: res.userRole === "admin" ? true : false,
+    username: res.user.username,
   };
-}
+};
+
+export const createCallMessage = async (callData: CallData) => {
+  try {
+    const res = await chatRepository.createCallMessage(callData);
+  } catch (error) {
+    console.error("error occurd", error);
+  }
+};

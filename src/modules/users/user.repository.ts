@@ -1,201 +1,139 @@
-import {
-  IUserRepository,
-  MiniUserProfile,
-  RawUserData,
-  RecentActivities,
-} from "./user.interface";
-import prisma from "../../common/config/db";
-import { injectable } from "inversify";
 import { randomInt } from "crypto";
+import prisma from "../../common/config/db";
+import { UserData } from "./user.interface";
+import { UserStatus } from "@prisma/client";
 
-@injectable()
-export class UserRepository implements IUserRepository {
-  async getUserId(email: string): Promise<{ userId: string } | null> {
-    try {
-      return await prisma.user.findUnique({
-        where: { email },
-        select: {
-          userId: true,
+export const getUserId = async (
+  email: string
+): Promise<{ userId: string } | null> => {
+  try {
+    return await prisma.user.findUnique({
+      where: { email },
+      select: {
+        userId: true,
+      },
+    });
+  } catch (error) {
+    throw new Error("Database error while fetching user.");
+  }
+};
+
+export const createUser = async (
+  email: string,
+  username: string
+): Promise<{ userId: string }> => {
+  try {
+    const defaultProfie = `https://storage.googleapis.com/simple-chat-cg.appspot.com/avatars/default/default${randomInt(
+      1,
+      6
+    )}.svg`;
+
+    return await prisma.$transaction(async (tx) => {
+      const userId = await tx.user.create({
+        data: { email, username, profilePicture: defaultProfie },
+        select: { userId: true },
+      });
+      await tx.recentActivity.create({
+        data: {
+          totalNewUnseenChats: 0,
+          userId: userId.userId,
+          lastUpdated: new Date(),
         },
       });
-    } catch (error) {
-      throw new Error("Database error while fetching user.");
-    }
+
+      return userId;
+    });
+  } catch (error) {
+    throw new Error("Database error while creating user.");
   }
-
-  async createUser(
-    email: string,
-    username: string
-  ): Promise<{ userId: string }> {
-    try {
-      const defaultProfie = `https://storage.googleapis.com/simple-chat-cg.appspot.com/avatars/default/default${randomInt(
-        1,
-        6
-      )}.svg`;
-
-      return await prisma.$transaction(async (tx) => {
-        const userId = await tx.user.create({
-          data: { email, username, profilePicture: defaultProfie },
-          select: { userId: true },
-        });
-        await tx.recentActivity.create({
-          data: {
-            totalNewFriendRequests: 0,
-            totalNewUnseenChats: 0,
-            unseenAcceptedFriendRequests: 0,
-            userId: userId.userId,
-            lastUpdated: new Date(),
-          },
-        });
-
-        return userId;
-      });
-    } catch (error) {
-      throw new Error("Database error while creating user.");
-    }
-  }
-  async getUserInfo(
-    userId: string,
-    query?: object
-  ): Promise<Partial<RawUserData> | null> {
-    const baseSelect = {
-      username: true,
-      email: true,
-      bio: true,
-      profilePicture: true,
-      createdAt: true,
-      _count: {
-        select: {
-          ChatRoomMember: true,
-          MessageSender: {
-            where: {
-              senderId: userId,
-            },
+};
+export const getUserInfo = async (
+  userId: string,
+  query?: object
+): Promise<Partial<UserData> | null> => {
+  const baseSelect = {
+    username: true,
+    email: true,
+    bio: true,
+    profilePicture: true,
+    createdAt: true,
+    _count: {
+      select: {
+        ChatRoomMember: true,
+        MessageSender: {
+          where: {
+            senderId: userId,
           },
         },
       },
-    };
+    },
+  };
 
-    const select =
-      query && Object.keys(query).length > 0
-        ? Object.fromEntries(
-            Object.entries(query).map(([key, value]) => [key, value === "true"])
-          )
-        : baseSelect;
+  const select =
+    query && Object.keys(query).length > 0
+      ? Object.fromEntries(
+          Object.entries(query).map(([key, value]) => [key, value === "true"])
+        )
+      : baseSelect;
 
-    return prisma.user.findUnique({
-      where: { userId: userId },
-      select: select,
-    });
-  }
+  return prisma.user.findUnique({
+    where: { userId: userId },
+    select: select,
+  });
+};
 
-  searchUsername = async (
-    query: string,
-    userId: string
-  ): Promise<Array<MiniUserProfile>> => {
-    return prisma.$queryRaw`
+export const searchUsername = async (
+  query: string,
+  userId: string
+): Promise<Array<UserData>> => {
+  return prisma.$queryRaw`
     SELECT "userId", "username", "profilePicture", "bio"
     FROM "User"
     WHERE similarity("username", ${query}) > 0.2
     AND "userId" != ${userId}::uuid
     LIMIT 10`;
+};
+
+export const updateUserStatus = async (
+  userId: string,
+  status: "online" | "offline"
+) => {
+  return await prisma.user.update({
+    where: {
+      userId: userId,
+    },
+    data: {
+      userStatus: status,
+      lastActive: new Date(),
+    },
+    select: {
+      userStatus: true,
+    },
+  });
+};
+export const updateUser = async ({
+  userId,
+  userData,
+}: {
+  userId: string;
+  userData: {
+    username?: string;
+    bio?: string;
+    profilePicture?: string;
+    status?: UserStatus;
   };
-
-  updateUserStatus = async (userId: string, status: "online" | "offline") => {
-    return await prisma.user.update({
-      where: {
-        userId: userId,
-      },
-      data: {
-        userStatus: status,
-        lastActive: new Date(),
-      },
-      select: {
-        userStatus: true,
-      },
-    });
-  };
-
-  getUserRecentActivities = async (
-    userId: string
-  ): Promise<RecentActivities | null> => {
-    return await prisma.recentActivity.findUnique({
-      where: {
-        userId: userId,
-      },
-      select: {
-        totalNewFriendRequests: true,
-        totalNewUnseenChats: true,
-        unseenAcceptedFriendRequests: true,
-      },
-    });
-  };
-  async updateRecentActivities(userId: string, data: any): Promise<any> {
-    return prisma.recentActivity.update({
-      where: {
-        userId: userId,
-      },
-      data: { ...data, lastUpdated: new Date() },
-    });
-  }
-  searchFriends = async (query: string, chatRoomId: string, userId: string) => {
-    const res = await prisma.$queryRaw<Omit<MiniUserProfile, "bio">[]>`
-      WITH eligible_friends AS (
-          SELECT DISTINCT
-              u."userId",
-              u."username",
-              u."profilePicture"
-          FROM "User" u
-          JOIN "Friendship" frnd ON (
-              (
-                  (frnd."userId2" = u."userId" AND frnd."userId1" = ${userId}::uuid) 
-                  OR 
-                  (frnd."userId1" = u."userId" AND frnd."userId2" = ${userId}::uuid)
-              )
-              AND (frnd."status" = 'accepted' OR frnd."chatRoomId" IS NOT NULL)
-          )
-          WHERE 
-              u."userId" != ${userId}::uuid
-              AND similarity(u."username", ${query}) > 0.2
-      )
-      SELECT 
-          ef."userId",
-          ef."username",
-          ef."profilePicture"
-      FROM eligible_friends ef
-      WHERE NOT EXISTS (
-          SELECT 1 
-          FROM "ChatRoomMember" crm 
-          WHERE crm."userId" = ef."userId" 
-          AND crm."chatRoomId" = ${chatRoomId}::uuid
-          AND crm."removedAt" IS NULL
-      )
-
-    `;
-
-    return res;
-  };
-
-  async updateUser({
-    userId,
-    bio,
-    username,
-    profilePicture,
-  }: {
-    userId: string;
-    bio?: string | undefined;
-    username?: string | undefined;
-    profilePicture?: string | undefined;
-  }): Promise<any> {
-    return await prisma.user.update({
-      where: {
-        userId: userId,
-      },
-      data: {
-        ...(username && { username }),
-        ...(bio && { bio }),
-        ...(profilePicture && { profilePicture }),
-      },
-    });
-  }
-}
+}): Promise<any> => {
+  return await prisma.user.update({
+    where: {
+      userId: userId,
+    },
+    data: {
+      ...(userData.username && { username: userData.username }),
+      ...(userData.bio && { bio: userData.bio }),
+      ...(userData.profilePicture && {
+        profilePicture: userData.profilePicture,
+      }),
+      ...(userData.status && { userStatus: userData.status }),
+    },
+  });
+};

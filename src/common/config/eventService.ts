@@ -1,46 +1,169 @@
+import { Server } from "socket.io";
 import EventEmitter from "events";
-import { injectable } from "inversify";
+import { connectedUsers } from "../websockets/websocket";
+export const eventManager = new EventEmitter();
 
-@injectable()
-export class EventManager {
-  private emitter = new EventEmitter();
+export const setUpNodeListeners = (io: Server) => {
+  eventManager.on(
+    "chatRoom:create",
+    (data: {
+      chatRoomId: string;
+      users: { username: string; userId: string }[];
+      currentUserId: string;
+    }) => {
+      data?.users.forEach((user) => {
+        const connectedUser = connectedUsers.get(user.userId);
+        if (connectedUser) {
+          io.in(connectedUser.socketId).socketsJoin(data.chatRoomId);
+        }
+      });
 
-  constructor() {
-    this.emitter.setMaxListeners(20);
+      io.to(data.chatRoomId)
+        .except(connectedUsers.get(data.currentUserId)?.socketId || "")
+        .emit("chatEvent", { event: "chatRoom:create", data: null });
+    }
+  );
+
+  interface MinifiedMessage {
+    messageId: string;
+    sender: {
+      userId: string;
+      username: string;
+    };
   }
-
-  public emit<T>(eventName: string, payload: T): boolean {
-    return this.emitter.emit(eventName, payload);
+  interface MessageNewPayload {
+    chatRoomId: string;
+    currentUserId: string;
+    message: MinifiedMessage;
   }
+  eventManager.on(
+    "message:new",
+    ({ chatRoomId, currentUserId, message }: MessageNewPayload) => {
+      io.to(chatRoomId)
+        .except(connectedUsers.get(currentUserId)?.socketId || "")
+        .emit("messageEvent", {
+          event: "message:new",
+          data: {
+            chatRoomId,
+            message: {
+              ...message,
+              type: "system",
+            },
+          },
+        });
+    }
+  );
 
-  public on<T>(eventName: string, listener: (payload: T) => void): void {
-    this.emitter.on(eventName, listener);
+  interface MemberRemovePayload {
+    chatRoomId: string;
+    userId: string;
+    currentUserId: string;
   }
+  eventManager.on(
+    "member:remove",
+    async ({ chatRoomId, userId, currentUserId }: MemberRemovePayload) => {
+      io.to(chatRoomId)
+        .except(connectedUsers.get(currentUserId)?.socketId || "")
+        .emit("chatEvent", {
+          event: "member:remove",
+          data: { chatRoomId: chatRoomId, userId: userId },
+        });
 
-  public once<T>(eventName: string, listener: (payload: T) => void): void {
-    this.emitter.once(eventName, listener);
+      io.in(connectedUsers.get(userId)?.socketId || "").socketsLeave(
+        chatRoomId
+      );
+    }
+  );
+
+  interface ChatRoomUpdatePayload {
+    chatRoomId: string;
+    data: any;
+    currentUserId: string;
   }
+  eventManager.on(
+    "chatRoom:update",
+    ({ chatRoomId, currentUserId, data }: ChatRoomUpdatePayload) => {
+      io.to(chatRoomId)
+        .except(currentUserId)
+        .emit("chatEvent", {
+          event: "chatRoom:update",
+          data: {
+            ...data,
+            chatRoomId,
+          },
+        });
+    }
+  );
 
-  public off(eventName: string, listener: (...args: any[]) => void): void {
-    this.emitter.off(eventName, listener);
+  interface MemberAddPayload {
+    chatRoomId: string;
+    users: string[];
+    currentUserId: string;
   }
+  eventManager.on("member:add", async (ev: MemberAddPayload) => {
+    for (let index = 0; index < ev.users.length; index++) {
+      const connectedUser = connectedUsers.get(ev.users[index]);
+      if (connectedUser) {
+        io.in(connectedUser.socketId).socketsJoin(ev.chatRoomId);
+      }
+    }
+    io.to(ev.chatRoomId)
+      .except(connectedUsers.get(ev.currentUserId)?.socketId || "")
+      .emit("chatEvent", {
+        event: "member:add",
+        data: {
+          chatRoomId: ev.chatRoomId,
+          users: ev.users,
+        },
+      });
+  });
+  type MemberUpdatePayload =
+    | {
+        type: "role";
+        data: {
+          targetUserId: string;
+          chatRoomId: string;
+          userRole: "admin" | "member";
+          currentUserId: string;
+        };
+      }
+    | {
+        type: "nickname";
+        data: {
+          chatRoomId: string;
+          targetUserId: string;
+          currentUserId: string;
+          nickname: string;
+        };
+      };
 
-  public removeAllListeners(eventName?: string): void {
-    this.emitter.removeAllListeners(eventName);
-  }
+  eventManager.on("member:update", (payload: MemberUpdatePayload) => {
+    const connectedUser = connectedUsers.get(payload.data.currentUserId);
 
-  public totalListenersCount() {
-    const events = this.emitter.eventNames(); // Get all event names
-    let totalListeners = 0;
+    if (payload.type === "role") {
+      io.to(payload.data.chatRoomId)
+        .except(connectedUser?.socketId || "")
+        .emit("chatEvent", {
+          event: "role:update",
+          data: {
+            userId: payload.data.targetUserId,
+            chatRoomId: payload.data.chatRoomId,
+            userRole: payload.data.userRole,
+          },
+        });
+    }
 
-    events.forEach((event) => {
-      totalListeners += this.emitter.listenerCount(event); // Sum listeners for each event
-    });
-
-    return totalListeners;
-  }
-
-  public eventNames(): Array<string | symbol> {
-    return this.emitter.eventNames();
-  }
-}
+    if (payload.type === "nickname") {
+      io.to(payload.data.chatRoomId)
+        .except(connectedUser?.socketId || "")
+        .emit("chatEvent", {
+          event: "nickname:update",
+          data: {
+            userId: payload.data.targetUserId,
+            chatRoomId: payload.data.chatRoomId,
+            nickname: payload.data.nickname,
+          },
+        });
+    }
+  });
+};
