@@ -4,7 +4,7 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "start": "node dist/server.js",
+    "start": "pm2 start src/server.ts --interpreter ./node_modules/.bin/tsx --name cgchat --watch",
     "dev": "nodemon --exec tsx src/server.ts",
     "build": "tsc",
     "test": "jest",
