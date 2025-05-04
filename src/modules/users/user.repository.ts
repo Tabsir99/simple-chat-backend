@@ -20,17 +20,18 @@ export const getUserId = async (
 
 export const createUser = async (
   email: string,
-  username: string
+  username: string,
+  profilePicture?: string
 ): Promise<{ userId: string }> => {
   try {
-    const defaultProfie = `https://storage.googleapis.com/simple-chat-cg.appspot.com/avatars/default/default${randomInt(
-      1,
-      6
-    )}.svg`;
-
     return await prisma.$transaction(async (tx) => {
       const userId = await tx.user.create({
-        data: { email, username, profilePicture: defaultProfie },
+        data: {
+          email,
+          username,
+          profilePicture,
+          userStatus: UserStatus.online,
+        },
         select: { userId: true },
       });
       await tx.recentActivity.create({
@@ -47,10 +48,7 @@ export const createUser = async (
     throw new Error("Database error while creating user.");
   }
 };
-export const getUserInfo = async (
-  userId: string,
-  query?: object
-): Promise<Partial<UserData> | null> => {
+export const getUserInfo = async (userId: string, query?: object) => {
   const baseSelect = {
     username: true,
     email: true,
@@ -94,23 +92,6 @@ export const searchUsername = async (
     LIMIT 10`;
 };
 
-export const updateUserStatus = async (
-  userId: string,
-  status: "online" | "offline"
-) => {
-  return await prisma.user.update({
-    where: {
-      userId: userId,
-    },
-    data: {
-      userStatus: status,
-      lastActive: new Date(),
-    },
-    select: {
-      userStatus: true,
-    },
-  });
-};
 export const updateUser = async ({
   userId,
   userData,

@@ -35,7 +35,8 @@ function getExpiry(days: number): Date {
 
 export async function handleUserLogin(
   email: string,
-  name?: string
+  name?: string,
+  profilePicture?: string
 ): Promise<{ refreshToken: string; userId: string }> {
   try {
     let userId = await userService.getUserId(email);
@@ -43,7 +44,8 @@ export async function handleUserLogin(
     if (!userId) {
       userId = await userService.createUser(
         email,
-        name || userService.generateUsernameFromEmail(email)
+        name || userService.generateUsernameFromEmail(email),
+        profilePicture
       );
     }
 

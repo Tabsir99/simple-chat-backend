@@ -21,7 +21,7 @@ export type CallData = {
 export interface ChatRoomHead {
   chatRoomId: string;
   roomName: string;
-  roomImage: string;
+  roomImage: string | null;
   isGroup: boolean;
   chatClearedAt: Date | null;
   joinedAt: Date;

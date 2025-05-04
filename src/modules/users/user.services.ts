@@ -15,23 +15,25 @@ export const getUserId = async (email: string): Promise<string | null> => {
 
 export const createUser = async (
   email: string,
-  username: string
+  username: string,
+  profilePicture?: string
 ): Promise<string> => {
-  const userID = await userRepository.createUser(email, username);
+  const userID = await userRepository.createUser(
+    email,
+    username,
+    profilePicture
+  );
   return userID.userId;
 };
 
-export const getUserInfo = async (
-  userId: string,
-  query?: object
-): Promise<Partial<UserData> | null> => {
+export const getUserInfo = async (userId: string, query?: object) => {
   try {
     const rawUserInfo = await userRepository.getUserInfo(userId, query);
     if (!rawUserInfo) {
       return null;
     }
 
-    const userInfo: Partial<UserData> = {
+    const userInfo = {
       ...rawUserInfo,
     };
 
@@ -55,13 +57,6 @@ export const queryByUsername = async (
   }
 };
 
-export const setUserStatus = async (
-  userId: string,
-  status: "online" | "offline"
-) => {
-  const result = await userRepository.updateUserStatus(userId, status);
-};
-
 export const updateUser = async (
   userId: string,
   userData: {
@@ -72,21 +67,20 @@ export const updateUser = async (
   }
 ) => {
   try {
-    let urlPromise: Promise<string> | undefined = undefined;
+    let urlPromise: string | undefined = undefined;
     if (userData.image) {
-      const path = `avatars/users/${userId}`;
-      urlPromise = mediaService.getWriteSignedUrl(path, {
+      const path = `avatars/${userId}`;
+      urlPromise = await mediaService.getWriteSignedUrl(path, {
         contentSize: userData.image.imageSize,
         contentType: userData.image.imageType,
       });
     }
-    const updatePromise = userRepository.updateUser({
+    const result = await userRepository.updateUser({
       userId,
       userData,
     });
 
-    const result = await Promise.all([urlPromise, updatePromise]);
-    return result[0];
+    return result;
   } catch (error) {
     console.error(error);
     throw error;

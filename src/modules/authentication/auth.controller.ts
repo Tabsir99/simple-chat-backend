@@ -20,14 +20,12 @@ export const verifyIdToken = async (
       idToken
     );
 
-    console.log(email, name, picture);
     const { refreshToken, userId } = await authService.handleUserLogin(
       email,
-      name
+      name,
+      picture
     );
 
-    
-    return res.json()
     const accessToken = await authService.generateAccessToken(
       { userId },
       "7d",
