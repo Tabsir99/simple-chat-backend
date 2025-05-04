@@ -3,7 +3,7 @@ import { exec } from "child_process";
 
 const whRouter = Router();
 
-whRouter.post("/webhook/github", (_, res) => {
+whRouter.post("/github", (_, res) => {
   res.json({});
   console.info("New changes pushed, pulling data...");
 

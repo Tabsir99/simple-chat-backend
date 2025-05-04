@@ -35,12 +35,12 @@ app.use(
 );
 app.use(cookieParser());
 
+app.use("/api/webhook",whRouter);
 app.use("/api", authRoute);
 app.use("/api", messageRouter);
 app.use("/api", mediaRouter);
 app.use("/api", userRoute);
 app.use("/api", chatRoute);
-app.use(whRouter);
 
 app.all("*", (req, res) => {
   res
