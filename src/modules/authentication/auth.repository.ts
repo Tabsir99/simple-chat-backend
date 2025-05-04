@@ -7,23 +7,11 @@ export async function saveToken(
 ): Promise<any> {
   try {
     return await prisma.$transaction(async (tx) => {
-      const familyId = await tx.tokenFamily.create({
-        data: {
-          isValid: true,
-          userId: userId,
-        },
-        select: {
-          familyId: true,
-        },
-      });
-
       await tx.refreshTokens.create({
         data: {
           expiresAt: expiresAt,
           tokenHash: tokenHash,
-          familyId: familyId.familyId,
           userId: userId,
-          isValid: true,
         },
       });
     });
@@ -41,13 +29,6 @@ export async function getToken(tokenHash: string) {
       },
       select: {
         expiresAt: true,
-        tokenFamily: {
-          select: {
-            familyId: true,
-            isValid: true,
-          },
-        },
-        isValid: true,
         tokenId: true,
         userId: true,
       },
@@ -62,12 +43,9 @@ export async function getToken(tokenHash: string) {
 
 export async function revokeToken(tokenId: string): Promise<void> {
   try {
-    await prisma.refreshTokens.update({
+    await prisma.refreshTokens.delete({
       where: {
-        tokenId: tokenId,
-      },
-      data: {
-        isValid: false,
+        tokenId,
       },
     });
   } catch (error) {
@@ -76,51 +54,21 @@ export async function revokeToken(tokenId: string): Promise<void> {
   }
 }
 
-export async function revokeFamily(familyId: string) {
-  return await prisma.tokenFamily.update({
-    where: {
-      familyId: familyId,
-    },
-    data: {
-      isValid: false,
-      RefreshTokens: {
-        updateMany: {
-          where: {
-            familyId: familyId,
-          },
-          data: {
-            isValid: false,
-          },
-        },
-      },
-    },
-  });
-}
-
 export async function rotateToken(
-  oldToken: { familyId: string; tokenId: string; expiresAt: Date },
+  oldToken: { tokenId: string; expiresAt: Date },
   newTokenHash: string,
   userId: string
 ): Promise<void> {
   try {
     return await prisma.$transaction(async (tx) => {
-      await tx.refreshTokens.create({
-        data: {
-          expiresAt: oldToken.expiresAt,
-          tokenHash: newTokenHash,
-          familyId: oldToken.familyId,
-          userId: userId,
-        },
-        select: {
-          tokenId: true,
-        },
-      });
       await tx.refreshTokens.update({
         where: {
           tokenId: oldToken.tokenId,
         },
         data: {
-          isValid: false,
+          expiresAt: oldToken.expiresAt,
+          tokenHash: newTokenHash,
+          userId: userId,
         },
       });
     });

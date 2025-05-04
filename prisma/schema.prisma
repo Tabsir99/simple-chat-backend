@@ -61,7 +61,6 @@ model User {
   MessageTarget Message[] @relation("TargetUser")
 
   RefreshTokens RefreshTokens[]
-  TokenFamily   TokenFamily[]
 
   Caller          CallSession[]     @relation("CallerRelation")
   CallParticipant CallParticipant[]
@@ -211,30 +210,16 @@ model RecentActivity {
   @@index([userId])
 }
 
-model TokenFamily {
-  familyId String   @id @default(uuid()) @db.Uuid
-  userId   String   @db.Uuid
-  issuedAt DateTime @default(now())
-  isValid  Boolean  @default(false)
-
-  user          User            @relation(fields: [userId], references: [userId])
-  RefreshTokens RefreshTokens[]
-}
-
 model RefreshTokens {
-  tokenId  String @id @default(uuid()) @db.Uuid
-  userId   String @db.Uuid
-  familyId String @db.Uuid
+  tokenId String @id @default(uuid()) @db.Uuid
+  userId  String @db.Uuid
 
   tokenHash String @db.VarChar(256)
 
   issuedAt  DateTime @default(now())
   expiresAt DateTime
 
-  isValid Boolean @default(true)
-
-  user        User        @relation(fields: [userId], references: [userId])
-  tokenFamily TokenFamily @relation(fields: [familyId], references: [familyId])
+  user User @relation(fields: [userId], references: [userId])
 
   @@unique([tokenHash])
 }

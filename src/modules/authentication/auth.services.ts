@@ -7,7 +7,8 @@ import config from "../../common/config/env";
 import * as userService from "../users/user.services";
 import * as authRepository from "./auth.repository";
 import sendEmail from "../../common/config/sendGrid";
-const generateAccessToken = async (
+
+export const generateAccessToken = async (
   userData: any,
   duration: string,
   secret: string
@@ -32,16 +33,17 @@ function getExpiry(days: number): Date {
   return now;
 }
 
-async function handleUserLogin(
-  email: string
-): Promise<{ refreshToken: string }> {
+export async function handleUserLogin(
+  email: string,
+  name?: string
+): Promise<{ refreshToken: string; userId: string }> {
   try {
-    let userID = await userService.getUserId(email);
+    let userId = await userService.getUserId(email);
 
-    if (!userID) {
-      userID = await userService.createUser(
+    if (!userId) {
+      userId = await userService.createUser(
         email,
-        userService.generateUsernameFromEmail(email)
+        name || userService.generateUsernameFromEmail(email)
       );
     }
 
@@ -49,9 +51,9 @@ async function handleUserLogin(
     const hashedToken = hashToken(refreshToken);
     const expiresAt = getExpiry(14);
 
-    await authRepository.saveToken(hashedToken, userID, expiresAt);
+    await authRepository.saveToken(hashedToken, userId, expiresAt);
 
-    return { refreshToken };
+    return { refreshToken, userId };
   } catch (error) {
     console.error(error, "FROM AUTH SERVICE HANDLE LOG IN");
     throw new Error("Error handling user login");
@@ -142,7 +144,7 @@ async function exchangeCodeForToken(code: string): Promise<any> {
   return tokenResponse.json();
 }
 
-async function verifyGoogleToken(
+export async function verifyGoogleToken(
   idToken: string
 ): Promise<{ email: string; name: string; picture: string }> {
   const jwkUrl = "https://www.googleapis.com/oauth2/v3/certs";
@@ -169,20 +171,9 @@ export async function verifyOrRefreshToken(
     if (!oldToken) {
       throw AuthError.tokenNotFound({ refreshToken });
     }
-    if (oldToken.expiresAt < new Date() && oldToken.isValid) {
+    if (oldToken.expiresAt < new Date()) {
       throw AuthError.tokenExpired({
         oldTokenId: oldToken.tokenId,
-      });
-    }
-    if (!oldToken.isValid) {
-      if (oldToken.tokenFamily.isValid) {
-        await authRepository.revokeFamily(oldToken.tokenFamily.familyId);
-        throw AuthError.invalidToken({
-          threat: true,
-        });
-      }
-      throw AuthError.invalidToken({
-        threat: false,
       });
     }
 
@@ -198,7 +189,6 @@ export async function verifyOrRefreshToken(
     await authRepository.rotateToken(
       {
         expiresAt: oldToken.expiresAt,
-        familyId: oldToken.tokenFamily.familyId,
         tokenId: oldToken.tokenId,
       },
       newRefreshTokenHash,
@@ -221,7 +211,7 @@ export async function revokeRefreshToken(oldToken: string) {
   try {
     const res = await authRepository.getToken(hashToken(oldToken));
     if (res) {
-      await authRepository.revokeFamily(res.tokenFamily.familyId);
+      await authRepository.revokeToken(res.tokenId);
     }
   } catch (error) {
     console.error(error);

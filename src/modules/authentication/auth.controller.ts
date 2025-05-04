@@ -5,12 +5,39 @@ import config from "../../common/config/env";
 import * as authService from "./auth.services";
 import * as cookieManager from "../../common/utils/cookieManager";
 
-export const redirectToGoogleAuth = (_: Request, res: Response): void => {
-  const redirectUri = encodeURIComponent(
-    `${config.baseUrl}/api/auth/google/callback`
-  );
-  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${config.googleClientId}&redirect_uri=${redirectUri}&scope=email profile&response_type=code`;
-  res.redirect(googleAuthUrl);
+export const verifyIdToken = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const idToken = req.body.idToken as string;
+  try {
+    if (!idToken) {
+      throw new Error("No tokne provided");
+    }
+
+    const { email, name, picture } = await authService.verifyGoogleToken(
+      idToken
+    );
+
+    console.log(email, name, picture);
+    const { refreshToken, userId } = await authService.handleUserLogin(
+      email,
+      name
+    );
+
+    
+    return res.json()
+    const accessToken = await authService.generateAccessToken(
+      { userId },
+      "7d",
+      config.jwtSecretAccess
+    );
+
+    res.json({ refreshToken, accessToken });
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const sendVerificationEmail = async (
@@ -102,7 +129,6 @@ export const verifyOrRefresh = async (
   next: NextFunction
 ) => {
   const refreshToken: string = req.cookies["refreshToken"];
-  console.log(refreshToken);
 
   try {
     const { newAccessToken, newRefreshToken } =

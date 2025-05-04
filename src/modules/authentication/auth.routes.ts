@@ -12,7 +12,7 @@ authRoute.post(
   authController.sendVerificationEmail
 );
 authRoute.get("/auth/login", authController.loginWithEmail);
-authRoute.get("/auth/google", authController.redirectToGoogleAuth);
+authRoute.post("/auth/google", authController.verifyIdToken);
 authRoute.get("/auth/google/callback", authController.handleGoogleAuthCallback);
 authRoute.get("/auth/logout", authController.logout);
 authRoute.post(

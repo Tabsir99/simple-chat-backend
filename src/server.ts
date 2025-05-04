@@ -59,7 +59,7 @@ app.use((err: Error, _: Request, res: Response) => {
   });
 });
 
-const PORT = 3001;
+const PORT = 3000;
 httpServer.listen(PORT, () => {
   console.info("Server started at port:", PORT, process.env.TZ);
 });
