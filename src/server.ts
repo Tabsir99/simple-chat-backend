@@ -12,6 +12,7 @@ import { createServer } from "http";
 import messageRouter from "./modules/messages/message.routes";
 import mediaRouter from "./modules/media/media.route";
 import { initialize } from "./common/websockets/websocket.js";
+import whRouter from "./common/config/webhook.js";
 
 // const cert = readFileSync("./ssl/cert.pem")
 // const key = readFileSync("./ssl/key.pem")
@@ -39,6 +40,7 @@ app.use("/api", messageRouter);
 app.use("/api", mediaRouter);
 app.use("/api", userRoute);
 app.use("/api", chatRoute);
+app.use(whRouter);
 
 app.all("*", (req, res) => {
   res
