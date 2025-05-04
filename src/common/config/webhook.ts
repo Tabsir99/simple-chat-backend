@@ -7,7 +7,7 @@ whRouter.post("/webhook/github", (_, res) => {
   res.json({});
   console.info("New changes pushed, pulling data...");
 
-  exec("git pull", { cwd: "/path/to/your/project" }, (err, _, stderr) => {
+  exec("git pull", { cwd: "/var/www/scb" }, (err, _, stderr) => {
     if (err) {
       console.error("Git pull failed:", stderr);
       return;
